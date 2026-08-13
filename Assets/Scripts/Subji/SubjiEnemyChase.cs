@@ -2,32 +2,80 @@ using UnityEngine;
 
 public class SubjiEnemyChase : MonoBehaviour
 {
-    [Header("Detection Settings")]
-    [Tooltip("Detection radius while the player is moving")]
+    public enum MovementType
+    {
+        PatrolAndChase,
+        WaitUntilPlayerFound,
+        CompletelyStationary
+    }
+
+    [Header("個体の行動タイプ")]
+    [Tooltip("徘徊型、発見まで停止する型、完全停止型から選びます")]
+    public MovementType movementType = MovementType.PatrolAndChase;
+
+    [Header("徘徊設定")]
+    [Tooltip("プレイヤーを発見していない時の移動速度")]
+    [Min(0f)] public float patrolSpeed = 1.5f;
+    [Tooltip("目的地へ到着してから次に動き出すまでの最小時間")]
+    [Min(0f)] public float minimumPatrolWait = 0.5f;
+    [Tooltip("目的地へ到着してから次に動き出すまでの最大時間")]
+    [Min(0f)] public float maximumPatrolWait = 2f;
+
+    [Header("発見・追跡設定")]
+    [Tooltip("プレイヤーが移動中の発見半径")]
     [Min(0.1f)] public float movingDetectionRadius = 5f;
 
-    [Tooltip("Detection radius while the player is stopped")]
+    [Tooltip("プレイヤーが停止中の発見半径")]
     [Min(0.1f)] public float idleDetectionRadius = 1.5f;
 
-    [Tooltip("Enemy chase speed")]
+    [Tooltip("プレイヤー追跡中の移動速度")]
     [Min(0f)] public float chaseSpeed = 3f;
+    [Tooltip("発見範囲から外れた後も追跡を続ける時間")]
+    [Min(0f)] public float chaseMemorySeconds = 1.5f;
 
     [Header("Target")]
     public Transform player;
+    [HideInInspector] public SubjiRoadMap roadMap;
 
     [Header("Detection Circle Appearance")]
     [Range(0.01f, 0.5f)] public float circleWidth = 0.12f;
 
     private LineRenderer detectionCircle;
     private SubjiPlayerMovement playerMovement;
+    private SpriteRenderer enemyRenderer;
+    private Vector2 patrolDestination;
+    private float patrolWaitTimer;
+    private float chaseMemoryTimer;
+    private bool hasPatrolDestination;
     private const int CircleSegments = 96;
+
+    public float CurrentDetectionRadius
+    {
+        get
+        {
+            bool playerIsMoving = playerMovement != null && playerMovement.IsMoving;
+            return playerIsMoving ? movingDetectionRadius : idleDetectionRadius;
+        }
+    }
 
     void Start()
     {
         if (player != null)
             playerMovement = player.GetComponent<SubjiPlayerMovement>();
 
+        enemyRenderer = GetComponent<SpriteRenderer>();
+
+        if (roadMap == null)
+            roadMap = FindFirstObjectByType<SubjiRoadMap>();
+
+        if (roadMap != null)
+        {
+            Vector2 extents = enemyRenderer != null ? enemyRenderer.bounds.extents : Vector2.zero;
+            transform.position = roadMap.GetClosestPointOnRoad(transform.position, extents);
+        }
+
         CreateDetectionCircle();
+        ChooseNextPatrolDestination();
     }
 
     void Update()
@@ -35,23 +83,80 @@ public class SubjiEnemyChase : MonoBehaviour
         if (player == null || detectionCircle == null)
             return;
 
-        bool playerIsMoving = playerMovement != null && playerMovement.IsMoving;
-        float activeRadius = playerIsMoving
-            ? movingDetectionRadius
-            : idleDetectionRadius;
+        float activeRadius = CurrentDetectionRadius;
 
         UpdateDetectionCircle(activeRadius);
 
         float distance = Vector2.Distance(transform.position, player.position);
-
         if (distance <= activeRadius)
+            chaseMemoryTimer = chaseMemorySeconds;
+        else
+            chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
+
+        bool isChasing = distance <= activeRadius || chaseMemoryTimer > 0f;
+        if (isChasing && movementType != MovementType.CompletelyStationary)
         {
-            transform.position = Vector2.MoveTowards(
-                transform.position,
-                player.position,
-                chaseSpeed * Time.deltaTime
-            );
+            MoveAlongRoad(player.position, chaseSpeed);
+            return;
         }
+
+        if (movementType == MovementType.PatrolAndChase)
+            UpdatePatrol();
+    }
+
+    void UpdatePatrol()
+    {
+        if (roadMap == null || patrolSpeed <= 0f)
+            return;
+
+        if (patrolWaitTimer > 0f)
+        {
+            patrolWaitTimer -= Time.deltaTime;
+            return;
+        }
+
+        if (!hasPatrolDestination)
+            ChooseNextPatrolDestination();
+
+        if (Vector2.Distance(transform.position, patrolDestination) <= 0.2f)
+        {
+            hasPatrolDestination = false;
+            patrolWaitTimer = Random.Range(minimumPatrolWait,
+                Mathf.Max(minimumPatrolWait, maximumPatrolWait));
+            return;
+        }
+
+        MoveAlongRoad(patrolDestination, patrolSpeed);
+    }
+
+    void ChooseNextPatrolDestination()
+    {
+        if (roadMap == null)
+            return;
+
+        patrolDestination = roadMap.GetRandomPointOnRoad();
+        hasPatrolDestination = true;
+    }
+
+    void MoveAlongRoad(Vector2 destination, float speed)
+    {
+        Vector2 currentPosition = transform.position;
+        Vector2 extents = enemyRenderer != null ? enemyRenderer.bounds.extents : Vector2.zero;
+        // 中心同士を無理に一致させず、敵が道路内に収まれる領域の中から
+        // プレイヤーとの重なり面積が最大になる（中心距離が最小の）位置を選ぶ。
+        Vector2 reachableDestination = roadMap != null
+            ? roadMap.GetClosestPointOnRoad(destination, extents)
+            : destination;
+        Vector2 pathPoint = roadMap != null
+            ? roadMap.GetShortestPathPoint(currentPosition, reachableDestination, extents)
+            : reachableDestination;
+        Vector2 desiredPosition = Vector2.MoveTowards(currentPosition, pathPoint,
+            speed * Time.deltaTime);
+
+        if (roadMap != null)
+            desiredPosition = roadMap.ConstrainToRoad(currentPosition, desiredPosition, extents);
+
+        transform.position = desiredPosition;
     }
 
     void CreateDetectionCircle()
@@ -77,7 +182,7 @@ public class SubjiEnemyChase : MonoBehaviour
         for (int i = 0; i < CircleSegments; i++)
         {
             float angle = i * Mathf.PI * 2f / CircleSegments;
-            Vector3 point = player.position + new Vector3(
+            Vector3 point = transform.position + new Vector3(
                 Mathf.Cos(angle) * radius,
                 Mathf.Sin(angle) * radius,
                 0f

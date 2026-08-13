@@ -502,6 +502,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SubjiPlayerMovement
   moveSpeed: 5
+  enemyOverlapThreshold: 0.3
   fieldSize: 60
   borderWidth: 0.3
 --- !u!61 &999597332
@@ -573,10 +574,10 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
-  m_Constraints: 0
+  m_Constraints: 4
 --- !u!1 &1178828640
 GameObject:
   m_ObjectHideFlags: 0
@@ -760,9 +761,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2021134c84144d7786795295401c27ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SubjiEnemyChase
+  movementType: 0
+  patrolSpeed: 1.5
+  minimumPatrolWait: 0.5
+  maximumPatrolWait: 2
   movingDetectionRadius: 5
   idleDetectionRadius: 1.5
   chaseSpeed: 3
+  chaseMemorySeconds: 1.5
   player: {fileID: 999597330}
   circleWidth: 0.12
 --- !u!212 &1646796433
@@ -839,6 +845,92 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2100000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2100000002}
+  - component: {fileID: 2100000001}
+  - component: {fileID: 2100000003}
+  m_Layer: 0
+  m_Name: Subji Road Map
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2100000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39a10622e88b48aca7a497179a5ce346, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SubjiRoadMap
+  fieldSize: 60
+  roadWidth: 6
+  horizontalRoads:
+  - -20
+  - 0
+  - 20
+  verticalRoads:
+  - -20
+  - 0
+  - 20
+  minimapSize: 180
+  minimapMargin: 16
+  minimapPlayerColor: {r: 0.15, g: 0.9, b: 1, a: 1}
+  minimapEnemyColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showDetectionRangesOnMinimap: 1
+  enableDebugToggleKey: 1
+  minimapDetectionRangeColor: {r: 1, g: 0.35, b: 0.2, a: 0.8}
+--- !u!114 &2100000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 791b93e628e54ad599c719f37c90ef67, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SubjiEnemySpawner
+  spawnInterval: 10
+  spawnMode: 0
+  fixedSpawnPoints:
+  - {x: -20, y: -20}
+  - {x: 20, y: 20}
+  snapFixedPointsToRoad: 1
+  enemyTemplate: {fileID: 1646796432}
+  maximumEnemies: 0
+  randomizeEnemyVariation: 0
+  waitingEnemyChance: 0.2
+  minimumSpeedMultiplier: 0.75
+  maximumSpeedMultiplier: 1.5
+--- !u!4 &2100000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -848,3 +940,4 @@ SceneRoots:
   - {fileID: 999597330}
   - {fileID: 1178828642}
   - {fileID: 1646796434}
+  - {fileID: 2100000002}

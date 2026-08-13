@@ -1,12 +1,21 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[ExecuteAlways]
 public class SubjiPlayerMovement : MonoBehaviour
 {
+    [Header("プレイヤーの設定")]
+    [Tooltip("プレイヤーが動く速さ")]
     public float moveSpeed = 5f;
-    public float fieldSize = 60f;
-    public float borderWidth = 0.3f;
+
+    [Header("敵の初期設定")]
+    [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
+    public Vector2 enemySpawnOffset = new Vector2(10f, 0f);
+
+    [Header("敵との接触判定")]
+    [Tooltip("プレイヤーの何割が敵と重なったら接触として数えるか。0.3は30%です")]
+    [Range(0.01f, 1f)] public float enemyOverlapThreshold = 0.3f;
 
     private Rigidbody2D rb;
     private SpriteRenderer playerRenderer;
@@ -15,21 +24,36 @@ public class SubjiPlayerMovement : MonoBehaviour
     private GUIStyle coordinateStyle;
     private Vector2 fieldCenter;
     private SubjiRoadMap roadMap;
+    private readonly HashSet<int> touchingEnemyIds = new HashSet<int>();
+    private readonly HashSet<int> checkedEnemyIds = new HashSet<int>();
 
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
+    public int EnemyContactCount { get; private set; }
+    public event Action<int> EnemyContactCountChanged;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         playerRenderer = GetComponent<SpriteRenderer>();
-        fieldCenter = transform.position;
-
-        CreateFieldBorder();
-        CreateRoadMap();
-        CreateEnemy();
-
-        if (!Application.isPlaying)
+        if (rb != null)
+        {
+            // FixedUpdate間の位置を描画フレームで補間し、見た目の小刻みな揺れを防ぐ。
+            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.freezeRotation = true;
+        }
+        roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        if (roadMap == null || !roadMap.IsReady)
+        {
+            Debug.LogError("Subji Road Map がシーンにありません。先にマップを配置してください。", this);
+            enabled = false;
             return;
+        }
+
+        fieldCenter = roadMap.Center;
+        roadMap.RegisterPlayer(transform);
+        transform.position = roadMap.GetClosestPointOnRoad(transform.position,
+            playerRenderer != null ? playerRenderer.bounds.extents : Vector2.zero);
+        CreateEnemy();
 
         moveAction = new InputAction("Move", InputActionType.Value);
         moveAction.AddCompositeBinding("2DVector")
@@ -47,14 +71,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void OnEnable()
     {
-        if (!Application.isPlaying)
-            fieldCenter = transform.position;
-
-        CreateFieldBorder();
-        CreateRoadMap();
-        CreateEnemy();
-
-        if (Application.isPlaying && moveAction != null)
+        if (moveAction != null)
             moveAction.Enable();
     }
 
@@ -72,6 +89,59 @@ public class SubjiPlayerMovement : MonoBehaviour
         movement = moveAction.ReadValue<Vector2>().normalized;
     }
 
+    void LateUpdate()
+    {
+        if (Application.isPlaying)
+            UpdateEnemyContacts();
+    }
+
+    void UpdateEnemyContacts()
+    {
+        if (playerRenderer == null)
+            return;
+
+        Bounds playerBounds = playerRenderer.bounds;
+        float playerArea = playerBounds.size.x * playerBounds.size.y;
+        if (playerArea <= Mathf.Epsilon)
+            return;
+
+        checkedEnemyIds.Clear();
+        SubjiEnemyChase[] enemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None);
+        foreach (SubjiEnemyChase enemy in enemies)
+        {
+            if (enemy == null)
+                continue;
+
+            int id = enemy.GetInstanceID();
+            checkedEnemyIds.Add(id);
+            SpriteRenderer enemySprite = enemy.GetComponent<SpriteRenderer>();
+            bool isTouching = enemySprite != null &&
+                GetOverlapArea(playerBounds, enemySprite.bounds) / playerArea >= enemyOverlapThreshold;
+
+            if (isTouching)
+            {
+                if (touchingEnemyIds.Add(id))
+                {
+                    EnemyContactCount++;
+                    EnemyContactCountChanged?.Invoke(EnemyContactCount);
+                }
+            }
+            else
+            {
+                touchingEnemyIds.Remove(id);
+            }
+        }
+
+        touchingEnemyIds.RemoveWhere(id => !checkedEnemyIds.Contains(id));
+    }
+
+    static float GetOverlapArea(Bounds a, Bounds b)
+    {
+        float width = Mathf.Max(0f, Mathf.Min(a.max.x, b.max.x) - Mathf.Max(a.min.x, b.min.x));
+        float height = Mathf.Max(0f, Mathf.Min(a.max.y, b.max.y) - Mathf.Max(a.min.y, b.min.y));
+        return width * height;
+    }
+
     void FixedUpdate()
     {
         if (!Application.isPlaying || rb == null)
@@ -80,72 +150,13 @@ public class SubjiPlayerMovement : MonoBehaviour
         Vector2 playerExtents = playerRenderer != null
             ? playerRenderer.bounds.extents
             : Vector2.zero;
-        float halfField = fieldSize * 0.5f;
         Vector2 nextPosition = rb.position
             + movement * moveSpeed * Time.fixedDeltaTime;
-
-        nextPosition.x = Mathf.Clamp(
-            nextPosition.x,
-            fieldCenter.x - halfField + playerExtents.x,
-            fieldCenter.x + halfField - playerExtents.x
-        );
-        nextPosition.y = Mathf.Clamp(
-            nextPosition.y,
-            fieldCenter.y - halfField + playerExtents.y,
-            fieldCenter.y + halfField - playerExtents.y
-        );
 
         if (roadMap != null)
             nextPosition = roadMap.ConstrainToRoad(rb.position, nextPosition, playerExtents);
 
         rb.MovePosition(nextPosition);
-        rb.linearVelocity = Vector2.zero;
-    }
-
-    void CreateRoadMap()
-    {
-        const string mapName = "Subji Road Map";
-        GameObject mapObject = GameObject.Find(mapName);
-
-        if (mapObject == null)
-            mapObject = new GameObject(mapName);
-
-        roadMap = mapObject.GetComponent<SubjiRoadMap>();
-        if (roadMap == null)
-            roadMap = mapObject.AddComponent<SubjiRoadMap>();
-
-        roadMap.Configure(transform, fieldCenter, fieldSize);
-    }
-
-    void CreateFieldBorder()
-    {
-        const string borderName = "60x60 Field Border";
-        GameObject borderObject = GameObject.Find(borderName);
-
-        if (borderObject == null)
-            borderObject = new GameObject(borderName);
-
-        LineRenderer border = borderObject.GetComponent<LineRenderer>();
-
-        if (border == null)
-            border = borderObject.AddComponent<LineRenderer>();
-
-        float halfField = fieldSize * 0.5f;
-        border.loop = true;
-        border.useWorldSpace = true;
-        border.positionCount = 4;
-        border.startWidth = borderWidth;
-        border.endWidth = borderWidth;
-        border.startColor = Color.black;
-        border.endColor = Color.black;
-        border.sortingOrder = -1;
-        if (border.sharedMaterial == null)
-            border.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
-
-        border.SetPosition(0, new Vector3(fieldCenter.x - halfField, fieldCenter.y - halfField, 0f));
-        border.SetPosition(1, new Vector3(fieldCenter.x - halfField, fieldCenter.y + halfField, 0f));
-        border.SetPosition(2, new Vector3(fieldCenter.x + halfField, fieldCenter.y + halfField, 0f));
-        border.SetPosition(3, new Vector3(fieldCenter.x + halfField, fieldCenter.y - halfField, 0f));
     }
 
     void CreateEnemy()
@@ -173,6 +184,13 @@ public class SubjiPlayerMovement : MonoBehaviour
             enemyChase = enemy.AddComponent<SubjiEnemyChase>();
 
         enemyChase.player = transform;
+        enemyChase.roadMap = roadMap;
+
+        Vector2 enemyExtents = enemyRenderer.bounds.extents;
+        Vector2 requestedSpawn = fieldCenter + enemySpawnOffset;
+        enemy.transform.position = roadMap != null
+            ? roadMap.GetClosestPointOnRoad(requestedSpawn, enemyExtents)
+            : requestedSpawn;
     }
 
     void OnGUI()
@@ -190,8 +208,13 @@ public class SubjiPlayerMovement : MonoBehaviour
         string coordinates = $"X: {transform.position.x:F1}  Y: {transform.position.y:F1}";
 
         GUI.color = new Color(0f, 0f, 0f, 0.7f);
-        GUI.Box(new Rect(10f, 10f, 275f, 48f), GUIContent.none);
+        GUI.Box(new Rect(10f, 70f, 210f, 48f), GUIContent.none);
         GUI.color = Color.white;
-        GUI.Label(new Rect(20f, 17f, 255f, 34f), coordinates, coordinateStyle);
+        GUI.Label(new Rect(20f, 77f, 190f, 34f), $"HIT: {EnemyContactCount}", coordinateStyle);
+
+        GUI.color = new Color(0f, 0f, 0f, 0.7f);
+        GUI.Box(new Rect(10f, 126f, 275f, 48f), GUIContent.none);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(20f, 133f, 255f, 34f), coordinates, coordinateStyle);
     }
 }

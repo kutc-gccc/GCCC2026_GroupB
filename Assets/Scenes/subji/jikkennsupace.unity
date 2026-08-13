@@ -266,9 +266,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 519420028}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2f774cd12b56a0e438b60a533f62f4e2, type: 3}
+  m_Script: {fileID: 11500000, guid: edfa0dcd66ae427cb6691423da2877e7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
+  m_EditorClassIdentifier: Assembly-CSharp::SubjiCameraFollow
   player: {fileID: 999597330}
 --- !u!1 &619394800
 GameObject:
@@ -498,9 +498,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 999597328}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ade9c17b6c9a034489cd184555e5cc83, type: 3}
+  m_Script: {fileID: 11500000, guid: 355b20c57d4d4e2d8471694ec7185990, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  m_EditorClassIdentifier: Assembly-CSharp::SubjiPlayerMovement
   moveSpeed: 5
   fieldSize: 60
   borderWidth: 0.3
@@ -757,9 +757,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1646796431}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b36f4580e504be09e36e980507b09ae, type: 3}
+  m_Script: {fileID: 11500000, guid: 2021134c84144d7786795295401c27ca, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyChase
+  m_EditorClassIdentifier: Assembly-CSharp::SubjiEnemyChase
   movingDetectionRadius: 5
   idleDetectionRadius: 1.5
   chaseSpeed: 3

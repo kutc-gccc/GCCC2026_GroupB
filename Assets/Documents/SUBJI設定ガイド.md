@@ -86,12 +86,18 @@ Hierarchyで `Player` を選び、`Subji Player Movement` コンポーネント�
 
 - `Move Speed`
   - プレイヤーの移動速度です。大きくすると速くなります。
+- `Speed Boost Key`
+  - 押している間、移動速度を上げるキーです。
+  - 初期設定は `Left Shift`（左Shift）です。Inspectorの選択欄から別のキーへ変更できます。
+- `Speed Boost Multiplier`
+  - 速度アップ中に `Move Speed` へ掛ける倍率です。初期設定は `2`です。
+  - 例えば `Move Speed = 5`、`Speed Boost Multiplier = 2` なら、キーを押している間の移動速度は `10` になります。
 - `Enemy Spawn Offset`
   - 最初からいる敵の希望出現位置です。
   - マップ中央を `X = 0, Y = 0` とした相対座標です。
   - 道路外を指定した場合は最寄りの道路へ自動補正されます。
 
-操作キーは `WASD` または矢印キーです。プレイヤーは道路の外へ移動できません。
+操作キーは `WASD` または矢印キーです。初期設定では、左Shiftを押している間だけ速く移動します。プレイヤーは道路の外へ移動できません。
 
 プレイヤーの `Rigidbody 2D` は移動時の小刻みな揺れを防ぐため、`Interpolate` が有効になっています。滑らかな表示に必要な設定なので、通常は `None` に戻さないでください。
 
@@ -228,6 +234,10 @@ Hierarchyで `Subji Road Map` を選び、`Subji Enemy Spawner` コンポーネ�
 ### 敵を速くする
 
 `Enemy` → `Subji Enemy Chase` → `Chase Speed` を大きくします。
+
+### 速度アップを右Shiftの3倍速にする
+
+`Player` → `Subji Player Movement` → `Speed Boost Key = Right Shift`、`Speed Boost Multiplier = 3`
 
 ### カメラの遅れを減らす
 

@@ -9,6 +9,13 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Tooltip("プレイヤーが動く速さ")]
     public float moveSpeed = 5f;
 
+    [Header("速度アップの設定")]
+    [Tooltip("押している間、移動速度が上がるキー")]
+    public Key speedBoostKey = Key.LeftShift;
+
+    [Tooltip("速度アップ中に移動速度へ掛ける倍率。2なら2倍速です")]
+    [Min(0f)] public float speedBoostMultiplier = 2f;
+
     [Header("敵の初期設定")]
     [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
     public Vector2 enemySpawnOffset = new Vector2(10f, 0f);
@@ -28,6 +35,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     private readonly HashSet<int> checkedEnemyIds = new HashSet<int>();
 
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
+    public bool IsSpeedBoosting { get; private set; }
     public int EnemyContactCount { get; private set; }
     public event Action<int> EnemyContactCountChanged;
 
@@ -87,6 +95,8 @@ public class SubjiPlayerMovement : MonoBehaviour
             return;
 
         movement = moveAction.ReadValue<Vector2>().normalized;
+        IsSpeedBoosting = Keyboard.current != null &&
+            Keyboard.current[speedBoostKey].isPressed;
     }
 
     void LateUpdate()
@@ -150,8 +160,11 @@ public class SubjiPlayerMovement : MonoBehaviour
         Vector2 playerExtents = playerRenderer != null
             ? playerRenderer.bounds.extents
             : Vector2.zero;
+        float currentMoveSpeed = IsSpeedBoosting
+            ? moveSpeed * speedBoostMultiplier
+            : moveSpeed;
         Vector2 nextPosition = rb.position
-            + movement * moveSpeed * Time.fixedDeltaTime;
+            + movement * currentMoveSpeed * Time.fixedDeltaTime;
 
         if (roadMap != null)
             nextPosition = roadMap.ConstrainToRoad(rb.position, nextPosition, playerExtents);

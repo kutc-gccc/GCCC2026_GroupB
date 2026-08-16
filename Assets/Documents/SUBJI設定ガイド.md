@@ -2,7 +2,7 @@
 
 対象シーン：`Assets/Scenes/subji/jikkennsupace.unity`
 
-この資料では、これまで追加した道路、プレイヤー、カメラ、敵、タイマーの設定場所をまとめています。基本的にはコードを書き換えず、UnityのInspectorから変更できます。
+この資料では、これまで追加した道路、プレイヤー、ダッシュゲージ、夜間視野、カメラ、敵、タイマーの設定場所をまとめています。基本的にはコードを書き換えず、UnityのInspectorから変更できます。
 
 ## 最初に覚える操作
 
@@ -10,6 +10,14 @@
 2. 左側のHierarchyから設定したいオブジェクトを選びます。
 3. 右側のInspectorに表示されるコンポーネントの数値を変更します。
 4. 再生ボタンを押して動作を確認します。
+
+ゲーム中の基本操作は次のとおりです。
+
+| 操作 | 初期キー |
+|---|---|
+| 移動 | `WASD` または矢印キー |
+| ダッシュ | 移動しながら左Shift |
+| 夜間視野の暗さをON/OFF | `P` |
 
 主に使うオブジェクトは次の4つです。
 
@@ -92,12 +100,50 @@ Hierarchyで `Player` を選び、`Subji Player Movement` コンポーネント�
 - `Speed Boost Multiplier`
   - 速度アップ中に `Move Speed` へ掛ける倍率です。初期設定は `2`です。
   - 例えば `Move Speed = 5`、`Speed Boost Multiplier = 2` なら、キーを押している間の移動速度は `10` になります。
+- `Speed Boost Duration`
+  - 満タンから連続でダッシュできる時間です。初期設定は `3` 秒です。
+- `Speed Boost Recharge Delay`
+  - Shiftを離してからゲージの回復が始まるまでの時間です。初期設定は `1` 秒です。
+- `Speed Boost Recharge Duration`
+  - 空のゲージが満タンになるまでの時間です。初期設定は `5` 秒です。
+- `Speed Boost Gauge Offset`
+  - プレイヤーを基準にしたゲージの表示位置です。
+- `Speed Boost Gauge Size`
+  - ゲージの横幅と縦幅です。
+- `Speed Boost Gauge Color`
+  - ゲージ本体の色と透明度です。
+- `Speed Boost Gauge Background Color`
+  - ゲージ背景の色と透明度です。
 - `Enemy Spawn Offset`
   - 最初からいる敵の希望出現位置です。
   - マップ中央を `X = 0, Y = 0` とした相対座標です。
   - 道路外を指定した場合は最寄りの道路へ自動補正されます。
 
-操作キーは `WASD` または矢印キーです。初期設定では、左Shiftを押している間だけ速く移動します。プレイヤーは道路の外へ移動できません。
+操作キーは `WASD` または矢印キーです。初期設定では、移動しながら左Shiftを押すと速く移動します。停止中はゲージを消費しません。ゲージは初めて使用した時に頭上へ現れ、ダッシュ中に減少し、Shiftを離すと設定時間後に回復します。満タンになると自動的に消えます。プレイヤーは道路の外へ移動できません。
+
+### 夜間視野（実験機能）
+
+プレイヤーの周囲だけを明るく残し、外側へ向かって徐々に暗くします。暗闇とグラデーションはゲーム開始時に自動生成されるため、HierarchyへUIを追加する必要はありません。
+
+- `Enable Night Vision`
+  - オンならゲーム開始時から暗闇を表示します。
+- `Night Vision Toggle Key`
+  - ゲーム中に暗闇をON/OFFするキーです。初期設定は `P` です。
+- `Player Vision Radius`
+  - 暗くならずに見える半径です。初期設定は `4.5` です。
+  - 敵の移動中索敵半径の初期値 `5` より少し小さく設定されています。
+- `Vision Gradient Width`
+  - 明るい範囲から視野外の暗さへ変化する幅です。大きいほど境界が柔らかくなります。
+- `Outside Darkness`
+  - 視野外の暗さです。`0` は透明、`1` は指定色を最大濃度で表示します。
+- `Darkness Color`
+  - 視野外へ重ねる色と透明度です。夜は黒、霧の実験なら灰色などに変更できます。
+- `Darkness Overlay Size`
+  - 暗闇が覆う一辺の長さです。カメラに暗闇の端が映る場合は大きくします。
+- `Darkness Texture Resolution`
+  - グラデーション画像の解像度です。大きいほど滑らかになりますが、開始時の生成負荷とメモリ使用量が増えます。
+
+夜間視野の設定はゲーム開始時に画像へ反映されます。色や半径を変更した場合は、一度再生を停止してから再度再生してください。
 
 プレイヤーの `Rigidbody 2D` は移動時の小刻みな揺れを防ぐため、`Interpolate` が有効になっています。滑らかな表示に必要な設定なので、通常は `None` に戻さないでください。
 
@@ -238,6 +284,10 @@ Hierarchyで `Subji Road Map` を選び、`Subji Enemy Spawner` コンポーネ�
 ### 速度アップを右Shiftの3倍速にする
 
 `Player` → `Subji Player Movement` → `Speed Boost Key = Right Shift`、`Speed Boost Multiplier = 3`
+
+### 夜間視野を青みのある暗さにする
+
+`Player` → `Subji Player Movement` → `Darkness Color` を暗い青色に変更します。暗さは `Outside Darkness` で調整します。
 
 ### カメラの遅れを減らす
 

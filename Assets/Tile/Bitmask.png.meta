@@ -1,0 +1,1131 @@
+fileFormatVersion: 2
+guid: 368185ace38cd0a448071939b7b90627
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 8835287164723286658
+    second: Bitmask_0
+  - first:
+      213: 3526937992149670785
+    second: Bitmask_1
+  - first:
+      213: -222736500932316000
+    second: Bitmask_2
+  - first:
+      213: 2940016685943354138
+    second: Bitmask_3
+  - first:
+      213: -7862657368803796238
+    second: Bitmask_4
+  - first:
+      213: 4662716521450754977
+    second: Bitmask_5
+  - first:
+      213: 5278784521687631440
+    second: Bitmask_6
+  - first:
+      213: 7795865421801302804
+    second: Bitmask_7
+  - first:
+      213: -7137971385079214840
+    second: Bitmask_8
+  - first:
+      213: -8275399310236307855
+    second: Bitmask_9
+  - first:
+      213: 5130032815479190063
+    second: Bitmask_10
+  - first:
+      213: -8583447686808904374
+    second: Bitmask_11
+  - first:
+      213: -9123460355028699120
+    second: Bitmask_12
+  - first:
+      213: -6595751429088438554
+    second: Bitmask_13
+  - first:
+      213: 8300122577163041634
+    second: Bitmask_14
+  - first:
+      213: -4233950037304898389
+    second: Bitmask_15
+  - first:
+      213: -6226506605190282688
+    second: Bitmask_16
+  - first:
+      213: 4910472907346190967
+    second: Bitmask_17
+  - first:
+      213: -4437893067035405578
+    second: Bitmask_18
+  - first:
+      213: 4464564745092716408
+    second: Bitmask_19
+  - first:
+      213: 1419900384641405602
+    second: Bitmask_20
+  - first:
+      213: -8447103378213078125
+    second: Bitmask_21
+  - first:
+      213: 1673778419929503637
+    second: Bitmask_22
+  - first:
+      213: 5654065757785147579
+    second: Bitmask_23
+  - first:
+      213: 6939638155593626442
+    second: Bitmask_24
+  - first:
+      213: -1219418841733331133
+    second: Bitmask_25
+  - first:
+      213: 3484983710860065026
+    second: Bitmask_26
+  - first:
+      213: -2060786221286936317
+    second: Bitmask_27
+  - first:
+      213: 1201681449018402505
+    second: Bitmask_28
+  - first:
+      213: -8076990476955367163
+    second: Bitmask_29
+  - first:
+      213: 5085517806327033333
+    second: Bitmask_30
+  - first:
+      213: -2798693819476508166
+    second: Bitmask_31
+  - first:
+      213: 1105846876572424195
+    second: Bitmask_32
+  - first:
+      213: 3774207252517253132
+    second: Bitmask_33
+  - first:
+      213: 3446872880698874776
+    second: Bitmask_34
+  - first:
+      213: -4941613329461937593
+    second: Bitmask_35
+  - first:
+      213: -9067383666617116446
+    second: Bitmask_36
+  - first:
+      213: 1385665365054171857
+    second: Bitmask_37
+  - first:
+      213: 2110190864294701670
+    second: Bitmask_38
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Bitmask_0
+      rect:
+        serializedVersion: 2
+        x: 9
+        y: 215
+        width: 62
+        height: 62
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28256ed6dde3d9a70800000000000000
+      internalID: 8835287164723286658
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_1
+      rect:
+        serializedVersion: 2
+        x: 87
+        y: 212
+        width: 66
+        height: 65
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 18b19e6da6332f030800000000000000
+      internalID: 3526937992149670785
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_2
+      rect:
+        serializedVersion: 2
+        x: 169
+        y: 215
+        width: 62
+        height: 62
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0a47a6f155ea8ecf0800000000000000
+      internalID: -222736500932316000
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_3
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 134
+        width: 66
+        height: 67
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a13ff5759990dc820800000000000000
+      internalID: 2940016685943354138
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_4
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 134
+        width: 62
+        height: 67
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2fa97ddf7ca32e290800000000000000
+      internalID: -7862657368803796238
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_5
+      rect:
+        serializedVersion: 2
+        x: 169
+        y: 135
+        width: 62
+        height: 62
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1a3da6dd8fb45b040800000000000000
+      internalID: 4662716521450754977
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_6
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 102
+        width: 18
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0568505ed82024940800000000000000
+      internalID: 5278784521687631440
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_7
+      rect:
+        serializedVersion: 2
+        x: 39
+        y: 89
+        width: 34
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41ba73ffb4a703c60800000000000000
+      internalID: 7795865421801302804
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_8
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 102
+        width: 14
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 80d437708d4d0fc90800000000000000
+      internalID: -7137971385079214840
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_9
+      rect:
+        serializedVersion: 2
+        x: 119
+        y: 106
+        width: 34
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 17e2ada1c20e72d80800000000000000
+      internalID: -8275399310236307855
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_10
+      rect:
+        serializedVersion: 2
+        x: 163
+        y: 96
+        width: 27
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f22fbb46aa9813740800000000000000
+      internalID: 5130032815479190063
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_11
+      rect:
+        serializedVersion: 2
+        x: 194
+        y: 115
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a4d5b9f4ec771e880800000000000000
+      internalID: -8583447686808904374
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_12
+      rect:
+        serializedVersion: 2
+        x: 207
+        y: 112
+        width: 18
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 018b7203525f26180800000000000000
+      internalID: -9123460355028699120
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_13
+      rect:
+        serializedVersion: 2
+        x: 224
+        y: 113
+        width: 16
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6e69862650f2774a0800000000000000
+      internalID: -6595751429088438554
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_14
+      rect:
+        serializedVersion: 2
+        x: 194
+        y: 96
+        width: 14
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 26bb00c0285ff2370800000000000000
+      internalID: 8300122577163041634
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_15
+      rect:
+        serializedVersion: 2
+        x: 207
+        y: 96
+        width: 18
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bac80bd9fdcfd35c0800000000000000
+      internalID: -4233950037304898389
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_16
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 96
+        width: 13
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 04282066b310799a0800000000000000
+      internalID: -6226506605190282688
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_17
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 70
+        width: 8
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 772ac89a711852440800000000000000
+      internalID: 4910472907346190967
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_18
+      rect:
+        serializedVersion: 2
+        x: 17
+        y: 70
+        width: 8
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6f29f2cb4cf6962c0800000000000000
+      internalID: -4437893067035405578
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_19
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 73
+        width: 30
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 877dbfb3bf155fd30800000000000000
+      internalID: 4464564745092716408
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_20
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 70
+        width: 6
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2a2ddfa70ef74b310800000000000000
+      internalID: 1419900384641405602
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_21
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 70
+        width: 6
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 39b7b907b3cd5ca80800000000000000
+      internalID: -8447103378213078125
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_22
+      rect:
+        serializedVersion: 2
+        x: 121
+        y: 68
+        width: 30
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 597dc98da947a3710800000000000000
+      internalID: 1673778419929503637
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_23
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 48
+        width: 18
+        height: 44
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bb8cb75a9d6477e40800000000000000
+      internalID: 5654065757785147579
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_24
+      rect:
+        serializedVersion: 2
+        x: 177
+        y: 64
+        width: 46
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a43b7ed722c8e4060800000000000000
+      internalID: 6939638155593626442
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_25
+      rect:
+        serializedVersion: 2
+        x: 225
+        y: 64
+        width: 14
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 34701123601c31fe0800000000000000
+      internalID: -1219418841733331133
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_26
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 54
+        width: 18
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 20936d588362d5030800000000000000
+      internalID: 3484983710860065026
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_27
+      rect:
+        serializedVersion: 2
+        x: 35
+        y: 34
+        width: 42
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3013c2aa9dd9663e0800000000000000
+      internalID: -2060786221286936317
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_28
+      rect:
+        serializedVersion: 2
+        x: 176
+        y: 32
+        width: 16
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9c62bed39ea3da010800000000000000
+      internalID: 1201681449018402505
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_29
+      rect:
+        serializedVersion: 2
+        x: 192
+        y: 32
+        width: 32
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 509ccd674f3c8ef80800000000000000
+      internalID: -8076990476955367163
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_30
+      rect:
+        serializedVersion: 2
+        x: 223
+        y: 32
+        width: 17
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5fdeb092083639640800000000000000
+      internalID: 5085517806327033333
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_31
+      rect:
+        serializedVersion: 2
+        x: 9
+        y: 0
+        width: 19
+        height: 49
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: af1850f9cca0929d0800000000000000
+      internalID: -2798693819476508166
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_32
+      rect:
+        serializedVersion: 2
+        x: 87
+        y: 20
+        width: 17
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 308131e00e1c85f00800000000000000
+      internalID: 1105846876572424195
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_33
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 15
+        width: 18
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c007ef2ef7da06430800000000000000
+      internalID: 3774207252517253132
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_34
+      rect:
+        serializedVersion: 2
+        x: 160
+        y: 32
+        width: 16
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 89bdbf76f90c5df20800000000000000
+      internalID: 3446872880698874776
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_35
+      rect:
+        serializedVersion: 2
+        x: 43
+        y: 2
+        width: 26
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 74af510dbdcdb6bb0800000000000000
+      internalID: -4941613329461937593
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_36
+      rect:
+        serializedVersion: 2
+        x: 159
+        y: 0
+        width: 17
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2e89b15a89e2a2280800000000000000
+      internalID: -9067383666617116446
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_37
+      rect:
+        serializedVersion: 2
+        x: 180
+        y: 3
+        width: 23
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1daad95de4fda3310800000000000000
+      internalID: 1385665365054171857
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Bitmask_38
+      rect:
+        serializedVersion: 2
+        x: 214
+        y: 0
+        width: 20
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 66a6f8a2967e84d10800000000000000
+      internalID: 2110190864294701670
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Bitmask_0: 8835287164723286658
+      Bitmask_1: 3526937992149670785
+      Bitmask_10: 5130032815479190063
+      Bitmask_11: -8583447686808904374
+      Bitmask_12: -9123460355028699120
+      Bitmask_13: -6595751429088438554
+      Bitmask_14: 8300122577163041634
+      Bitmask_15: -4233950037304898389
+      Bitmask_16: -6226506605190282688
+      Bitmask_17: 4910472907346190967
+      Bitmask_18: -4437893067035405578
+      Bitmask_19: 4464564745092716408
+      Bitmask_2: -222736500932316000
+      Bitmask_20: 1419900384641405602
+      Bitmask_21: -8447103378213078125
+      Bitmask_22: 1673778419929503637
+      Bitmask_23: 5654065757785147579
+      Bitmask_24: 6939638155593626442
+      Bitmask_25: -1219418841733331133
+      Bitmask_26: 3484983710860065026
+      Bitmask_27: -2060786221286936317
+      Bitmask_28: 1201681449018402505
+      Bitmask_29: -8076990476955367163
+      Bitmask_3: 2940016685943354138
+      Bitmask_30: 5085517806327033333
+      Bitmask_31: -2798693819476508166
+      Bitmask_32: 1105846876572424195
+      Bitmask_33: 3774207252517253132
+      Bitmask_34: 3446872880698874776
+      Bitmask_35: -4941613329461937593
+      Bitmask_36: -9067383666617116446
+      Bitmask_37: 1385665365054171857
+      Bitmask_38: 2110190864294701670
+      Bitmask_4: -7862657368803796238
+      Bitmask_5: 4662716521450754977
+      Bitmask_6: 5278784521687631440
+      Bitmask_7: 7795865421801302804
+      Bitmask_8: -7137971385079214840
+      Bitmask_9: -8275399310236307855
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

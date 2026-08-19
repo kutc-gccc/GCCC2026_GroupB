@@ -346,7 +346,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_6
+      name: brick1
       rect:
         serializedVersion: 2
         x: 176
@@ -368,7 +368,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_7
+      name: brickU
       rect:
         serializedVersion: 2
         x: 192
@@ -390,7 +390,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_8
+      name: brick2
       rect:
         serializedVersion: 2
         x: 208
@@ -654,7 +654,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_20
+      name: brickUL
       rect:
         serializedVersion: 2
         x: 176
@@ -698,7 +698,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_22
+      name: brickUR
       rect:
         serializedVersion: 2
         x: 208
@@ -962,7 +962,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_34
+      name: brickL
       rect:
         serializedVersion: 2
         x: 160
@@ -1006,7 +1006,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_36
+      name: brickC
       rect:
         serializedVersion: 2
         x: 192
@@ -1050,7 +1050,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_38
+      name: brickR
       rect:
         serializedVersion: 2
         x: 224
@@ -1314,7 +1314,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_50
+      name: brickDL
       rect:
         serializedVersion: 2
         x: 176
@@ -1358,7 +1358,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_52
+      name: brickDR
       rect:
         serializedVersion: 2
         x: 208
@@ -1534,7 +1534,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_60
+      name: brick3
       rect:
         serializedVersion: 2
         x: 176
@@ -1556,7 +1556,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_61
+      name: brickD
       rect:
         serializedVersion: 2
         x: 192
@@ -1578,7 +1578,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_62
+      name: brick4
       rect:
         serializedVersion: 2
         x: 208
@@ -2810,7 +2810,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_118
+      name: wallUL
       rect:
         serializedVersion: 2
         x: 32
@@ -2832,7 +2832,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_119
+      name: wallU
       rect:
         serializedVersion: 2
         x: 48
@@ -2854,7 +2854,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_120
+      name: wallUR
       rect:
         serializedVersion: 2
         x: 64
@@ -3140,7 +3140,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_133
+      name: wallL
       rect:
         serializedVersion: 2
         x: 32
@@ -3162,7 +3162,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_134
+      name: wallC
       rect:
         serializedVersion: 2
         x: 48
@@ -3184,7 +3184,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_135
+      name: wallR
       rect:
         serializedVersion: 2
         x: 64
@@ -3470,7 +3470,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_148
+      name: wallDL
       rect:
         serializedVersion: 2
         x: 32
@@ -3492,7 +3492,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_149
+      name: wallD
       rect:
         serializedVersion: 2
         x: 48
@@ -3514,7 +3514,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_150
+      name: wallDR
       rect:
         serializedVersion: 2
         x: 64
@@ -3646,7 +3646,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_156
+      name: light2
       rect:
         serializedVersion: 2
         x: 160
@@ -3976,7 +3976,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_171
+      name: light1
       rect:
         serializedVersion: 2
         x: 160
@@ -4240,7 +4240,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_183
+      name: light0
       rect:
         serializedVersion: 2
         x: 160
@@ -4658,7 +4658,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_202
+      name: stairUL
       rect:
         serializedVersion: 2
         x: 32
@@ -4680,7 +4680,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_203
+      name: stairU
       rect:
         serializedVersion: 2
         x: 48
@@ -4702,7 +4702,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_204
+      name: stairUR
       rect:
         serializedVersion: 2
         x: 64
@@ -4922,7 +4922,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_214
+      name: stairL
       rect:
         serializedVersion: 2
         x: 32
@@ -4944,7 +4944,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_215
+      name: stairC
       rect:
         serializedVersion: 2
         x: 48
@@ -4966,7 +4966,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_216
+      name: stairR
       rect:
         serializedVersion: 2
         x: 64
@@ -5126,9 +5126,6 @@ TextureImporter:
       Port Town Free_112: 2144905123
       Port Town Free_116: -1709500291
       Port Town Free_117: 431415885
-      Port Town Free_118: 2044525599
-      Port Town Free_119: 1294612569
-      Port Town Free_120: -1222820759
       Port Town Free_121: 1473972075
       Port Town Free_122: 1300275326
       Port Town Free_123: -1522171240
@@ -5142,9 +5139,6 @@ TextureImporter:
       Port Town Free_130: 1808579484
       Port Town Free_131: -754264757
       Port Town Free_132: -927221629
-      Port Town Free_133: 1171292197
-      Port Town Free_134: -1185094316
-      Port Town Free_135: 1261232364
       Port Town Free_136: -308147103
       Port Town Free_137: -1568809529
       Port Town Free_138: 1461168430
@@ -5158,16 +5152,12 @@ TextureImporter:
       Port Town Free_145: -1489065907
       Port Town Free_146: 318514034
       Port Town Free_147: 1259717326
-      Port Town Free_148: -1861216277
-      Port Town Free_149: 1188362832
       Port Town Free_15: -1218134060251229664
-      Port Town Free_150: -855106775
       Port Town Free_151: -471475950
       Port Town Free_152: -1942721696
       Port Town Free_153: 237191296
       Port Town Free_154: -470776887
       Port Town Free_155: -1671700978
-      Port Town Free_156: 1678806456
       Port Town Free_157: -1402124515
       Port Town Free_158: -2105227100
       Port Town Free_159: 36788835
@@ -5184,7 +5174,6 @@ TextureImporter:
       Port Town Free_169: -1905210988
       Port Town Free_17: 87580823637950717
       Port Town Free_170: 1030812683
-      Port Town Free_171: 1950194298
       Port Town Free_172: -1599589945
       Port Town Free_173: -158247762
       Port Town Free_174: 1515092868
@@ -5197,7 +5186,6 @@ TextureImporter:
       Port Town Free_180: -1385718397
       Port Town Free_181: -1649874755
       Port Town Free_182: 789698289
-      Port Town Free_183: 1417411716
       Port Town Free_184: 912827838
       Port Town Free_185: 1634456975
       Port Town Free_186: 81332750
@@ -5215,12 +5203,8 @@ TextureImporter:
       Port Town Free_197: -215032638
       Port Town Free_198: 718194211
       Port Town Free_199: -52704126
-      Port Town Free_20: 5025623609604232157
       Port Town Free_200: 1631367802
       Port Town Free_201: 1541997590
-      Port Town Free_202: -1429722944
-      Port Town Free_203: 2113090182
-      Port Town Free_204: 922611637
       Port Town Free_205: -736093753
       Port Town Free_206: 1265475723
       Port Town Free_207: 739008798
@@ -5231,13 +5215,9 @@ TextureImporter:
       Port Town Free_211: -526818417
       Port Town Free_212: -368866880
       Port Town Free_213: -2066270371
-      Port Town Free_214: -1775358203
-      Port Town Free_215: 1065394575
-      Port Town Free_216: -1735620549
       Port Town Free_217: -1991161719
       Port Town Free_218: -1303360309
       Port Town Free_219: 1067510053
-      Port Town Free_22: 4681050379053981013
       Port Town Free_220: 1713831721
       Port Town Free_221: 1732394687
       Port Town Free_23: -4980491920632625098
@@ -5249,11 +5229,8 @@ TextureImporter:
       Port Town Free_31: 1336575906207601287
       Port Town Free_32: -2951308391646728301
       Port Town Free_33: -2920194850754743100
-      Port Town Free_34: -2766711159935082840
       Port Town Free_35: 996529762245366253
-      Port Town Free_36: 7149624222112205946
       Port Town Free_37: 1952485293235551455
-      Port Town Free_38: -3031742082960315847
       Port Town Free_39: 736691198
       Port Town Free_4: 3091945658738939769
       Port Town Free_41: -643761020
@@ -5265,24 +5242,17 @@ TextureImporter:
       Port Town Free_48: -425548637
       Port Town Free_49: 563408457
       Port Town Free_5: -5891535048478945827
-      Port Town Free_50: -1947089752
       Port Town Free_51: 1134158339
-      Port Town Free_52: -1491688976
       Port Town Free_53: -1316130222
       Port Town Free_57: 405548421
       Port Town Free_58: 1544208769
       Port Town Free_59: 778282779
-      Port Town Free_6: 3394022757741489492
-      Port Town Free_60: -1910005140
-      Port Town Free_61: -80623870
-      Port Town Free_62: 696131155
       Port Town Free_63: -89836688
       Port Town Free_64: -1519439227
       Port Town Free_65: 1670283918
       Port Town Free_66: 1039724544
       Port Town Free_67: 24198031
       Port Town Free_68: 1657869449
-      Port Town Free_7: 3373878284396125253
       Port Town Free_72: -1262408233
       Port Town Free_73: 1224141348
       Port Town Free_74: 550547621
@@ -5291,7 +5261,6 @@ TextureImporter:
       Port Town Free_77: 1981535413
       Port Town Free_78: -938286536
       Port Town Free_79: 1996407437
-      Port Town Free_8: 1858017129802406299
       Port Town Free_80: 892166175
       Port Town Free_84: -1574844417
       Port Town Free_85: 785928797
@@ -5305,6 +5274,19 @@ TextureImporter:
       Port Town Free_97: -1539434185
       Port Town Free_98: 1820208893
       Port Town Free_99: -554565561
+      brick1: 3394022757741489492
+      brick2: 1858017129802406299
+      brick3: -1910005140
+      brick4: 696131155
+      brickC: 7149624222112205946
+      brickD: -80623870
+      brickDL: -1947089752
+      brickDR: -1491688976
+      brickL: -2766711159935082840
+      brickR: -3031742082960315847
+      brickU: 3373878284396125253
+      brickUL: 5025623609604232157
+      brickUR: 4681050379053981013
       gras: 1242245240
       grass1: 1730278632
       grass2: 1857693924
@@ -5322,6 +5304,15 @@ TextureImporter:
       grassD: 619835689
       grassL: 193401319
       grassR: -2004921867
+      light0: 1417411716
+      light1: 1950194298
+      light2: 1678806456
+      stairC: 1065394575
+      stairL: -1775358203
+      stairR: -1735620549
+      stairU: 2113090182
+      stairUL: -1429722944
+      stairUR: 922611637
       stoneC: 4821868251439346731
       stoneD: 460548755
       stoneDDL: 303042083
@@ -5335,6 +5326,15 @@ TextureImporter:
       stoneUR: -6638008609817994454
       stoneUUL: 1848160452164040416
       stoneUUR: -9186569788217610602
+      wallC: -1185094316
+      wallD: 1188362832
+      wallDL: -1861216277
+      wallDR: -855106775
+      wallL: 1171292197
+      wallR: 1261232364
+      wallU: 1294612569
+      wallUL: 2044525599
+      wallUR: -1222820759
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 /// The component is created automatically by SubjiPlayerMovement.
 /// </summary>
 [DefaultExecutionOrder(-1000)]
+[ExecuteAlways]
 public class SubjiRoadMap : MonoBehaviour
 {
     [Header("道路の設定")]
@@ -16,6 +17,9 @@ public class SubjiRoadMap : MonoBehaviour
     public float[] horizontalRoads = { -20f, 0f, 20f };
     [Tooltip("マップ中心からの左右方向の位置です")]
     public float[] verticalRoads = { -20f, 0f, 20f };
+    [Tooltip("Sceneビューに道路を表示します")]
+    public bool showRoadsInSceneView = true;
+    public Color roadColor = new Color(0.18f, 0.2f, 0.23f, 1f);
 
     [Header("ミニマップの設定")]
     [Range(100f, 400f)] public float minimapSize = 180f;
@@ -49,8 +53,46 @@ public class SubjiRoadMap : MonoBehaviour
         IsReady = true;
     }
 
+    private void OnEnable()
+    {
+        if (!Application.isPlaying)
+            RefreshEditorRoads();
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (Application.isPlaying || !isActiveAndEnabled)
+            return;
+        UnityEditor.EditorApplication.delayCall += RefreshEditorRoads;
+    }
+#endif
+
+    private void RefreshEditorRoads()
+    {
+        if (this == null || Application.isPlaying)
+            return;
+
+        center = transform.position;
+        MeshRenderer renderer = GetComponent<MeshRenderer>();
+        if (!showRoadsInSceneView)
+        {
+            if (renderer != null)
+                renderer.enabled = false;
+            return;
+        }
+
+        BuildRoads();
+        renderer = GetComponent<MeshRenderer>();
+        if (renderer != null)
+            renderer.enabled = true;
+    }
+
     private void Update()
     {
+        if (!Application.isPlaying)
+            return;
+
         if (!enableDebugToggleKey || Keyboard.current == null)
             return;
 
@@ -344,7 +386,11 @@ public class SubjiRoadMap : MonoBehaviour
     private void BuildRoads()
     {
         if (roadMaterial == null)
+        {
             roadMaterial = new Material(Shader.Find("Sprites/Default"));
+            if (!Application.isPlaying)
+                roadMaterial.hideFlags = HideFlags.DontSaveInEditor;
+        }
 
         MeshFilter meshFilter = GetComponent<MeshFilter>();
         if (meshFilter == null)
@@ -358,9 +404,16 @@ public class SubjiRoadMap : MonoBehaviour
         meshRenderer.sortingOrder = -5;
 
         if (roadMesh != null)
-            Destroy(roadMesh);
+        {
+            if (Application.isPlaying)
+                Destroy(roadMesh);
+            else
+                DestroyImmediate(roadMesh);
+        }
 
         roadMesh = new Mesh { name = "Complete Road Map Mesh" };
+        if (!Application.isPlaying)
+            roadMesh.hideFlags = HideFlags.DontSaveInEditor;
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
         List<Color> colors = new List<Color>();
@@ -380,7 +433,7 @@ public class SubjiRoadMap : MonoBehaviour
         meshFilter.sharedMesh = roadMesh;
     }
 
-    private static void AddQuad(List<Vector3> vertices, List<int> triangles,
+    private void AddQuad(List<Vector3> vertices, List<int> triangles,
         List<Color> colors, Rect rect)
     {
         int first = vertices.Count;
@@ -390,7 +443,6 @@ public class SubjiRoadMap : MonoBehaviour
         vertices.Add(new Vector3(rect.xMax, rect.yMin, 0f));
         triangles.Add(first); triangles.Add(first + 1); triangles.Add(first + 2);
         triangles.Add(first); triangles.Add(first + 2); triangles.Add(first + 3);
-        Color roadColor = new Color(0.18f, 0.2f, 0.23f, 1f);
         colors.Add(roadColor); colors.Add(roadColor); colors.Add(roadColor); colors.Add(roadColor);
     }
 

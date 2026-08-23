@@ -17,6 +17,13 @@ public class JikkenCommentStream : MonoBehaviour
         [TextArea] public string taskText;
     }
 
+    private class AcceptedTask
+    {
+        public RectTransform rect;
+        public TextMeshProUGUI label;
+        public Vector2 destination;
+    }
+
     [Header("開閉設定")]
     public Key toggleKey = Key.T;
 
@@ -33,6 +40,10 @@ public class JikkenCommentStream : MonoBehaviour
         }
     };
     [Range(0f, 100f)] public float taskCommentChance = 25f;
+
+    [Header("タスク目的地")]
+    [Tooltip("目的地へこの距離まで近づくとタスク完了になります")]
+    [Min(0.1f)] public float taskArrivalDistance = 1f;
 
     [Header("表示設定")]
     public TMP_FontAsset fontAsset;
@@ -61,14 +72,22 @@ public class JikkenCommentStream : MonoBehaviour
     [Min(0.0001f)] public float editorPreviewScale = 0.01f;
 
     private readonly List<RectTransform> comments = new List<RectTransform>();
+    private readonly List<AcceptedTask> acceptedTasks = new List<AcceptedTask>();
     private GameObject uiRoot;
     private RectTransform commentContent;
     private RectTransform taskContent;
     private float timer;
     private bool isOpen;
+    private SubjiRoadMap roadMap;
+    private Transform player;
+    private AcceptedTask selectedTask;
 
     private void Awake()
     {
+        roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        SubjiPlayerMovement playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+        if (playerMovement != null)
+            player = playerMovement.transform;
         EnsureUiExists(false);
         if (Application.isPlaying)
             uiRoot.SetActive(false);
@@ -104,6 +123,8 @@ public class JikkenCommentStream : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
+
+        UpdateActiveTask();
 
         if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
         {
@@ -339,10 +360,15 @@ public class JikkenCommentStream : MonoBehaviour
 
         if (isTask)
         {
+            Vector2 destination = roadMap != null
+                ? roadMap.GetRandomPointOnRoad()
+                : Vector2.zero;
+            TextMeshProUGUI taskLabel = comment.GetComponent<TextMeshProUGUI>();
+            taskLabel.text = $"◆ 座標 X:{destination.x:F1}、Y:{destination.y:F1} を調査して！";
             Button button = comment.AddComponent<Button>();
             button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
             int capturedIndex = taskIndex;
-            button.onClick.AddListener(() => AcceptTask(rect, capturedIndex));
+            button.onClick.AddListener(() => AcceptTask(rect, capturedIndex, destination));
         }
         else
         {
@@ -362,7 +388,7 @@ public class JikkenCommentStream : MonoBehaviour
         return words[UnityEngine.Random.Range(0, words.Length)];
     }
 
-    private void AcceptTask(RectTransform sourceComment, int taskIndex)
+    private void AcceptTask(RectTransform sourceComment, int taskIndex, Vector2 destination)
     {
         if (taskIndex < 0 || taskIndex >= taskComments.Length)
             return;
@@ -374,20 +400,86 @@ public class JikkenCommentStream : MonoBehaviour
             Destroy(sourceComment.gameObject);
         ArrangeComments();
 
-        for (int i = taskContent.childCount - 1; i >= 0; i--)
-            Destroy(taskContent.GetChild(i).gameObject);
-
         GameObject task = CreateTextObject("Accepted Task", taskContent,
-            taskComments[taskIndex].taskText, fontSize, Color.white);
+            $"タスク：指定地点へ移動\nX:{destination.x:F1}、Y:{destination.y:F1} のところへ進め",
+            fontSize, Color.white);
         RectTransform taskRect = task.GetComponent<RectTransform>();
         taskRect.anchorMin = new Vector2(0f, 1f);
         taskRect.anchorMax = new Vector2(1f, 1f);
         taskRect.pivot = new Vector2(0.5f, 1f);
-        taskRect.anchoredPosition = Vector2.zero;
-        taskRect.sizeDelta = new Vector2(0f, 180f);
+        taskRect.sizeDelta = new Vector2(0f, 110f);
         TextMeshProUGUI label = task.GetComponent<TextMeshProUGUI>();
         label.alignment = TextAlignmentOptions.TopLeft;
         label.textWrappingMode = TextWrappingModes.Normal;
+
+        AcceptedTask acceptedTask = new AcceptedTask
+        {
+            rect = taskRect,
+            label = label,
+            destination = destination
+        };
+        Button taskButton = task.AddComponent<Button>();
+        taskButton.targetGraphic = label;
+        taskButton.onClick.AddListener(() => SelectTask(acceptedTask));
+        acceptedTasks.Add(acceptedTask);
+        ArrangeAcceptedTasks();
+
+        if (roadMap == null)
+            roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        if (player == null)
+        {
+            SubjiPlayerMovement playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+            if (playerMovement != null)
+                player = playerMovement.transform;
+        }
+
+    }
+
+    private void SelectTask(AcceptedTask task)
+    {
+        if (task == null || task.rect == null)
+            return;
+
+        selectedTask = task;
+        for (int i = 0; i < acceptedTasks.Count; i++)
+        {
+            bool isSelected = acceptedTasks[i] == selectedTask;
+            acceptedTasks[i].label.color = isSelected ? Color.yellow : Color.white;
+            acceptedTasks[i].label.fontStyle = isSelected ? FontStyles.Bold : FontStyles.Normal;
+        }
+
+        if (roadMap != null)
+            roadMap.SetTaskDestination(task.destination);
+    }
+
+    private void ArrangeAcceptedTasks()
+    {
+        const float acceptedTaskHeight = 110f;
+        for (int i = acceptedTasks.Count - 1; i >= 0; i--)
+        {
+            if (acceptedTasks[i].rect == null)
+            {
+                acceptedTasks.RemoveAt(i);
+                continue;
+            }
+            acceptedTasks[i].rect.anchoredPosition = new Vector2(0f, -(i * acceptedTaskHeight));
+        }
+    }
+
+    private void UpdateActiveTask()
+    {
+        if (selectedTask == null || roadMap == null || player == null)
+            return;
+
+        if (Vector2.Distance(player.position, selectedTask.destination) > taskArrivalDistance)
+            return;
+
+        roadMap.ClearTaskDestination();
+        acceptedTasks.Remove(selectedTask);
+        if (selectedTask.rect != null)
+            Destroy(selectedTask.rect.gameObject);
+        selectedTask = null;
+        ArrangeAcceptedTasks();
     }
 
     private GameObject CreateTextObject(string objectName, Transform parent,

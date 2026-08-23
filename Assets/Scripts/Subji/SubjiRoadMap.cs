@@ -26,6 +26,7 @@ public class SubjiRoadMap : MonoBehaviour
     [Range(0f, 50f)] public float minimapMargin = 16f;
     public Color minimapPlayerColor = new Color(0.15f, 0.9f, 1f, 1f);
     public Color minimapEnemyColor = new Color(1f, 0.2f, 0.2f, 1f);
+    public Color minimapDestinationColor = new Color(0.2f, 1f, 0.25f, 1f);
 
     [Header("デバッグ表示")]
     [Tooltip("敵の発見範囲をミニマップ上に表示します")]
@@ -41,10 +42,14 @@ public class SubjiRoadMap : MonoBehaviour
     private Transform player;
     private Vector2 center;
     private GUIStyle minimapLabelStyle;
+    private Vector2 taskDestination;
+    private bool hasTaskDestination;
 
     public Vector2 Center => center;
 
     public bool IsReady { get; private set; }
+    public bool HasTaskDestination => hasTaskDestination;
+    public Vector2 TaskDestination => taskDestination;
 
     private void Awake()
     {
@@ -103,6 +108,17 @@ public class SubjiRoadMap : MonoBehaviour
     public void RegisterPlayer(Transform target)
     {
         player = target;
+    }
+
+    public void SetTaskDestination(Vector2 destination)
+    {
+        taskDestination = GetClosestPointOnRoad(destination, Vector2.zero);
+        hasTaskDestination = true;
+    }
+
+    public void ClearTaskDestination()
+    {
+        hasTaskDestination = false;
     }
 
     public void Configure(Transform target, Vector2 mapCenter, float size)
@@ -480,6 +496,16 @@ public class SubjiRoadMap : MonoBehaviour
         float markerY = mapSize - ((local.y + fieldSize * 0.5f) * scale);
         GUI.color = minimapPlayerColor;
         GUI.DrawTexture(new Rect(markerX - 5f, markerY - 5f, 10f, 10f), Texture2D.whiteTexture);
+
+        if (hasTaskDestination)
+        {
+            Vector2 destinationLocal = taskDestination - center;
+            float destinationX = (destinationLocal.x + fieldSize * 0.5f) * scale;
+            float destinationY = mapSize - ((destinationLocal.y + fieldSize * 0.5f) * scale);
+            GUI.color = minimapDestinationColor;
+            GUI.DrawTexture(new Rect(destinationX - 5f, destinationY - 5f, 10f, 10f),
+                Texture2D.whiteTexture);
+        }
 
         SubjiEnemyChase[] enemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None);
         GUI.color = minimapEnemyColor;

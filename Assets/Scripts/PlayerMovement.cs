@@ -7,6 +7,10 @@ public class PlayerMovement : MonoBehaviour
     public float moveSpeed = 5f;
     public float fieldSize = 60f;
     public float borderWidth = 0.3f;
+    [Tooltip("60x60の移動可能範囲にプレイヤーを制限します")]
+    public bool constrainToField = true;
+    [Tooltip("60x60の外周ボーダーを表示します")]
+    public bool showFieldBorder = true;
 
     private Rigidbody2D rb;
     private SpriteRenderer playerRenderer;
@@ -84,16 +88,19 @@ public class PlayerMovement : MonoBehaviour
         Vector2 nextPosition = rb.position
             + movement * moveSpeed * Time.fixedDeltaTime;
 
-        nextPosition.x = Mathf.Clamp(
-            nextPosition.x,
-            fieldCenter.x - halfField + playerHalfWidth,
-            fieldCenter.x + halfField - playerHalfWidth
-        );
-        nextPosition.y = Mathf.Clamp(
-            nextPosition.y,
-            fieldCenter.y - halfField + playerHalfHeight,
-            fieldCenter.y + halfField - playerHalfHeight
-        );
+        if (constrainToField)
+        {
+            nextPosition.x = Mathf.Clamp(
+                nextPosition.x,
+                fieldCenter.x - halfField + playerHalfWidth,
+                fieldCenter.x + halfField - playerHalfWidth
+            );
+            nextPosition.y = Mathf.Clamp(
+                nextPosition.y,
+                fieldCenter.y - halfField + playerHalfHeight,
+                fieldCenter.y + halfField - playerHalfHeight
+            );
+        }
 
         rb.MovePosition(nextPosition);
         rb.linearVelocity = Vector2.zero;
@@ -103,6 +110,32 @@ public class PlayerMovement : MonoBehaviour
     {
         const string borderName = "60x60 Field Border";
         GameObject borderObject = GameObject.Find(borderName);
+
+        if (borderObject == null && !showFieldBorder)
+        {
+            Transform[] sceneTransforms = FindObjectsByType<Transform>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (Transform sceneTransform in sceneTransforms)
+            {
+                if (sceneTransform.name == borderName)
+                {
+                    borderObject = sceneTransform.gameObject;
+                    break;
+                }
+            }
+        }
+
+        if (!showFieldBorder)
+        {
+            if (borderObject != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(borderObject);
+                else
+                    DestroyImmediate(borderObject);
+            }
+            return;
+        }
 
         if (borderObject == null)
             borderObject = new GameObject(borderName);

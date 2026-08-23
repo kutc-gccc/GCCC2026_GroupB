@@ -31327,6 +31327,8 @@ MonoBehaviour:
   moveSpeed: 5
   fieldSize: 60
   borderWidth: 0.3
+  constrainToField: 0
+  showFieldBorder: 0
 --- !u!61 &999597332
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -50329,7 +50331,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!120 &1178828641
 LineRenderer:
   serializedVersion: 3

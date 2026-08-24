@@ -167,7 +167,7 @@ TextureImporter:
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 16
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
-  spriteGenerateFallbackPhysicsShape: 1
+  spriteGenerateFallbackPhysicsShape: 0
   alphaUsage: 1
   alphaIsTransparency: 1
   spriteTessellationDetail: -1
@@ -3668,7 +3668,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_157
+      name: isuUL
       rect:
         serializedVersion: 2
         x: 176
@@ -3690,7 +3690,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_158
+      name: isuU
       rect:
         serializedVersion: 2
         x: 192
@@ -3712,7 +3712,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_159
+      name: isuUR
       rect:
         serializedVersion: 2
         x: 208
@@ -3998,7 +3998,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_172
+      name: isuL
       rect:
         serializedVersion: 2
         x: 176
@@ -4020,7 +4020,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_173
+      name: isuC
       rect:
         serializedVersion: 2
         x: 192
@@ -4042,7 +4042,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_174
+      name: isuR
       rect:
         serializedVersion: 2
         x: 208
@@ -4284,7 +4284,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_185
+      name: kadan1
       rect:
         serializedVersion: 2
         x: 192
@@ -4306,7 +4306,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_186
+      name: kadan2
       rect:
         serializedVersion: 2
         x: 208
@@ -4548,7 +4548,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_197
+      name: kadan3
       rect:
         serializedVersion: 2
         x: 192
@@ -4570,7 +4570,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Port Town Free_198
+      name: kadan4
       rect:
         serializedVersion: 2
         x: 208
@@ -5158,9 +5158,6 @@ TextureImporter:
       Port Town Free_153: 237191296
       Port Town Free_154: -470776887
       Port Town Free_155: -1671700978
-      Port Town Free_157: -1402124515
-      Port Town Free_158: -2105227100
-      Port Town Free_159: 36788835
       Port Town Free_16: 5317397177083337825
       Port Town Free_160: -1556988234
       Port Town Free_161: 333940640
@@ -5174,9 +5171,6 @@ TextureImporter:
       Port Town Free_169: -1905210988
       Port Town Free_17: 87580823637950717
       Port Town Free_170: 1030812683
-      Port Town Free_172: -1599589945
-      Port Town Free_173: -158247762
-      Port Town Free_174: 1515092868
       Port Town Free_175: 779385294
       Port Town Free_176: 2003024570
       Port Town Free_177: -1441731450
@@ -5187,8 +5181,6 @@ TextureImporter:
       Port Town Free_181: -1649874755
       Port Town Free_182: 789698289
       Port Town Free_184: 912827838
-      Port Town Free_185: 1634456975
-      Port Town Free_186: 81332750
       Port Town Free_187: -517680473
       Port Town Free_188: -476493263
       Port Town Free_189: -1725252516
@@ -5200,8 +5192,6 @@ TextureImporter:
       Port Town Free_194: -2129531026
       Port Town Free_195: -182074873
       Port Town Free_196: 403245542
-      Port Town Free_197: -215032638
-      Port Town Free_198: 718194211
       Port Town Free_199: -52704126
       Port Town Free_200: 1631367802
       Port Town Free_201: 1541997590
@@ -5304,6 +5294,16 @@ TextureImporter:
       grassD: 619835689
       grassL: 193401319
       grassR: -2004921867
+      isuC: -158247762
+      isuL: -1599589945
+      isuR: 1515092868
+      isuU: -2105227100
+      isuUL: -1402124515
+      isuUR: 36788835
+      kadan1: 1634456975
+      kadan2: 81332750
+      kadan3: -215032638
+      kadan4: 718194211
       light0: 1417411716
       light1: 1950194298
       light2: 1678806456

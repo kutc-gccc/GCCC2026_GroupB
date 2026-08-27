@@ -5,7 +5,8 @@ public class SubjiEnemySpawner : MonoBehaviour
     public enum SpawnMode
     {
         RandomOnRoad,
-        FixedPoints
+        FixedPoints,
+        RandomOnStage
     }
 
     [Header("出現タイマー")]
@@ -122,8 +123,13 @@ public class SubjiEnemySpawner : MonoBehaviour
         {
             Vector2 point = fixedSpawnPoints[fixedPointIndex];
             fixedPointIndex = (fixedPointIndex + 1) % fixedSpawnPoints.Length;
-            return snapFixedPointsToRoad ? roadMap.GetClosestPointOnRoad(point, Vector2.zero) : point;
+            return snapFixedPointsToRoad && roadMap.restrictMovementToRoads
+                ? roadMap.GetClosestPointOnRoad(point, Vector2.zero)
+                : point;
         }
+
+        if (spawnMode == SpawnMode.RandomOnStage || !roadMap.restrictMovementToRoads)
+            return roadMap.GetRandomPointOnRoad();
 
         return roadMap.GetRandomPointOnRoad();
     }

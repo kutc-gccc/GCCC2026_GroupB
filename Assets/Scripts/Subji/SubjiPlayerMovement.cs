@@ -331,9 +331,9 @@ public class SubjiPlayerMovement : MonoBehaviour
 
             int id = enemy.GetInstanceID();
             checkedEnemyIds.Add(id);
-            SpriteRenderer enemySprite = enemy.GetComponent<SpriteRenderer>();
-            bool isTouching = enemySprite != null &&
-                GetOverlapArea(playerBounds, enemySprite.bounds) / playerArea >= enemyOverlapThreshold;
+            Bounds enemyBounds = enemy.GetContactBounds();
+            bool isTouching = enemyBounds.size.sqrMagnitude > 0f &&
+                GetOverlapArea(playerBounds, enemyBounds) / playerArea >= enemyOverlapThreshold;
 
             if (isTouching)
             {
@@ -395,7 +395,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (enemyRenderer.sprite == null && playerRenderer != null)
             enemyRenderer.sprite = playerRenderer.sprite;
 
-        enemyRenderer.color = new Color(1f, 0.2f, 0.2f, 1f);
+        enemyRenderer.color = Color.white;
         enemyRenderer.sortingOrder = 1;
 
         SubjiEnemyChase enemyChase = enemy.GetComponent<SubjiEnemyChase>();

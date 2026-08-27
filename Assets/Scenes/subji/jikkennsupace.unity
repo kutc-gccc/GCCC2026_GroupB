@@ -68085,6 +68085,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SubjiEnemyChase
   movementType: 0
+  spriteResourcePath: guard
+  visualScale: {x: 1.567, y: 1.5}
+  collisionSize: {x: 0.52, y: 0.9}
+  collisionOffset: {x: 0, y: 0.45}
   patrolSpeed: 1.5
   minimumPatrolWait: 0.5
   maximumPatrolWait: 2
@@ -209436,6 +209440,10 @@ MonoBehaviour:
   normalTextColor: {r: 1, g: 1, b: 1, a: 1}
   taskTextColor: {r: 1, g: 0.25, b: 0.25, a: 1}
   panelColor: {r: 0.03, g: 0.32, b: 0.45, a: 0.97}
+  popupDuration: 3
+  popupSize: {x: 650, y: 130}
+  popupPosition: {x: 0, y: -8}
+  popupTextColor: {r: 0, g: 0, b: 0, a: 1}
   screenMargin: 8
   commentPanelRect:
     serializedVersion: 2

@@ -10,6 +10,10 @@ using UnityEngine.InputSystem;
 [ExecuteAlways]
 public class SubjiRoadMap : MonoBehaviour
 {
+    [Header("ステージ移動設定")]
+    [Tooltip("オフの場合、道路を使わずステージ範囲内を自由に移動します")]
+    public bool restrictMovementToRoads = true;
+
     [Header("道路の設定")]
     [Min(10f)] public float fieldSize = 60f;
     [Min(1f)] public float roadWidth = 6f;
@@ -44,6 +48,10 @@ public class SubjiRoadMap : MonoBehaviour
     private GUIStyle minimapLabelStyle;
     private Vector2 taskDestination;
     private bool hasTaskDestination;
+    private SpriteRenderer[] stageMapSprites;
+    private Camera minimapCamera;
+    private RenderTexture minimapTexture;
+    private GameObject stageMapRoot;
 
     public Vector2 Center => center;
 
@@ -80,7 +88,7 @@ public class SubjiRoadMap : MonoBehaviour
 
         center = transform.position;
         MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (!showRoadsInSceneView)
+        if (!showRoadsInSceneView || !restrictMovementToRoads)
         {
             if (renderer != null)
                 renderer.enabled = false;
@@ -108,6 +116,86 @@ public class SubjiRoadMap : MonoBehaviour
     public void RegisterPlayer(Transform target)
     {
         player = target;
+        RefreshStageMapSprites();
+    }
+
+    private void RefreshStageMapSprites()
+    {
+        stageMapRoot = GameObject.Find("Stage Map (from stagen)");
+        stageMapSprites = stageMapRoot != null
+            ? stageMapRoot.GetComponentsInChildren<SpriteRenderer>(true)
+            : new SpriteRenderer[0];
+
+        if (!restrictMovementToRoads)
+            RefreshStageBounds();
+    }
+
+    private void RefreshStageBounds()
+    {
+        if (stageMapRoot == null)
+            return;
+
+        Renderer[] renderers = stageMapRoot.GetComponentsInChildren<Renderer>(true);
+        bool foundBounds = false;
+        Bounds stageBounds = default;
+        foreach (Renderer stageRenderer in renderers)
+        {
+            if (stageRenderer == null || !stageRenderer.enabled ||
+                !stageRenderer.gameObject.activeInHierarchy)
+                continue;
+
+            Bounds rendererBounds = stageRenderer.bounds;
+            if (rendererBounds.size.x <= 0.01f || rendererBounds.size.y <= 0.01f)
+                continue;
+
+            if (!foundBounds)
+            {
+                stageBounds = rendererBounds;
+                foundBounds = true;
+            }
+            else
+            {
+                stageBounds.Encapsulate(rendererBounds);
+            }
+        }
+
+        if (!foundBounds)
+            return;
+
+        center = stageBounds.center;
+        fieldSize = Mathf.Max(stageBounds.size.x, stageBounds.size.y) + 2f;
+        UpdateMinimapCamera();
+    }
+
+    private void EnsureMinimapCamera()
+    {
+        if (minimapCamera != null && minimapTexture != null)
+            return;
+
+        GameObject cameraObject = new GameObject("Runtime Stage Minimap Camera");
+        cameraObject.transform.SetParent(transform, false);
+        minimapCamera = cameraObject.AddComponent<Camera>();
+        minimapCamera.orthographic = true;
+        minimapCamera.clearFlags = CameraClearFlags.SolidColor;
+        minimapCamera.backgroundColor = new Color(0.04f, 0.06f, 0.08f, 1f);
+        minimapCamera.cullingMask = ~0;
+        minimapCamera.depth = -100f;
+
+        minimapTexture = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32);
+        minimapTexture.name = "Runtime Stage Minimap";
+        minimapTexture.filterMode = FilterMode.Bilinear;
+        minimapCamera.targetTexture = minimapTexture;
+        UpdateMinimapCamera();
+    }
+
+    private void UpdateMinimapCamera()
+    {
+        if (minimapCamera == null)
+            return;
+
+        minimapCamera.transform.position = new Vector3(center.x, center.y, -100f);
+        minimapCamera.transform.rotation = Quaternion.identity;
+        minimapCamera.orthographicSize = Mathf.Max(1f, fieldSize * 0.5f);
     }
 
     public void SetTaskDestination(Vector2 destination)
@@ -132,6 +220,10 @@ public class SubjiRoadMap : MonoBehaviour
 
     public Vector2 ConstrainToRoad(Vector2 currentPosition, Vector2 desiredPosition, Vector2 playerExtents)
     {
+        // 新ステージでは60x60の旧フィールド境界を含め、移動制限を一切かけない。
+        if (!restrictMovementToRoads)
+            return desiredPosition;
+
         float halfField = fieldSize * 0.5f;
         desiredPosition.x = Mathf.Clamp(desiredPosition.x,
             center.x - halfField + playerExtents.x,
@@ -164,6 +256,9 @@ public class SubjiRoadMap : MonoBehaviour
         float mapMaxY = center.y + halfField - extents.y;
         position.x = Mathf.Clamp(position.x, mapMinX, mapMaxX);
         position.y = Mathf.Clamp(position.y, mapMinY, mapMaxY);
+
+        if (!restrictMovementToRoads)
+            return position;
 
         // すでにその個体が道路内へ収まる位置なら、座標を変えない。
         if (IsOnRoad(position, extents))
@@ -208,6 +303,12 @@ public class SubjiRoadMap : MonoBehaviour
     public Vector2 GetRandomPointOnRoad()
     {
         float halfField = fieldSize * 0.5f;
+        if (!restrictMovementToRoads)
+        {
+            return new Vector2(
+                Random.Range(center.x - halfField, center.x + halfField),
+                Random.Range(center.y - halfField, center.y + halfField));
+        }
         bool useHorizontal = horizontalRoads != null && horizontalRoads.Length > 0 &&
             (verticalRoads == null || verticalRoads.Length == 0 || Random.value < 0.5f);
 
@@ -265,6 +366,9 @@ public class SubjiRoadMap : MonoBehaviour
 
     public Vector2 GetShortestPathPoint(Vector2 from, Vector2 target, Vector2 extents)
     {
+        if (!restrictMovementToRoads)
+            return target;
+
         if (SegmentStaysOnRoad(from, target, extents))
             return target;
 
@@ -473,30 +577,43 @@ public class SubjiRoadMap : MonoBehaviour
         GUI.color = new Color(0.04f, 0.06f, 0.08f, 0.88f);
         GUI.Box(map, GUIContent.none);
 
-        GUI.BeginGroup(map);
-        float scale = mapSize / fieldSize;
-        GUI.color = new Color(0.55f, 0.57f, 0.6f, 1f);
-
-        foreach (float y in horizontalRoads)
+        if (!restrictMovementToRoads)
         {
-            float screenY = mapSize - ((y + fieldSize * 0.5f) * scale);
-            GUI.DrawTexture(new Rect(0f, screenY - roadWidth * scale * 0.5f,
-                mapSize, roadWidth * scale), Texture2D.whiteTexture);
+            EnsureMinimapCamera();
+            if (minimapTexture != null)
+            {
+                GUI.color = Color.white;
+                GUI.DrawTexture(map, minimapTexture, ScaleMode.StretchToFill, false);
+            }
         }
 
-        foreach (float x in verticalRoads)
+        GUI.BeginGroup(map);
+        float scale = mapSize / fieldSize;
+        if (restrictMovementToRoads)
         {
-            float screenX = (x + fieldSize * 0.5f) * scale;
-            GUI.DrawTexture(new Rect(screenX - roadWidth * scale * 0.5f, 0f,
-                roadWidth * scale, mapSize), Texture2D.whiteTexture);
+            GUI.color = new Color(0.55f, 0.57f, 0.6f, 1f);
+            foreach (float y in horizontalRoads)
+            {
+                float screenY = mapSize - ((y + fieldSize * 0.5f) * scale);
+                GUI.DrawTexture(new Rect(0f, screenY - roadWidth * scale * 0.5f,
+                    mapSize, roadWidth * scale), Texture2D.whiteTexture);
+            }
+
+            foreach (float x in verticalRoads)
+            {
+                float screenX = (x + fieldSize * 0.5f) * scale;
+                GUI.DrawTexture(new Rect(screenX - roadWidth * scale * 0.5f, 0f,
+                    roadWidth * scale, mapSize), Texture2D.whiteTexture);
+            }
+        }
+        else
+        {
+            // 背景は専用カメラがTilemap、道、建物をまとめて描画する。
         }
 
         Vector2 local = (Vector2)player.position - center;
         float markerX = (local.x + fieldSize * 0.5f) * scale;
         float markerY = mapSize - ((local.y + fieldSize * 0.5f) * scale);
-        GUI.color = minimapPlayerColor;
-        GUI.DrawTexture(new Rect(markerX - 5f, markerY - 5f, 10f, 10f), Texture2D.whiteTexture);
-
         if (hasTaskDestination)
         {
             Vector2 destinationLocal = taskDestination - center;
@@ -524,6 +641,14 @@ public class SubjiRoadMap : MonoBehaviour
             GUI.color = minimapEnemyColor;
             GUI.DrawTexture(new Rect(enemyX - 4f, enemyY - 4f, 8f, 8f), Texture2D.whiteTexture);
         }
+
+        // 最後に描画して、背景や敵の索敵円にプレイヤーが隠れないようにする。
+        markerX = Mathf.Clamp(markerX, 7f, mapSize - 7f);
+        markerY = Mathf.Clamp(markerY, 7f, mapSize - 7f);
+        GUI.color = Color.white;
+        GUI.DrawTexture(new Rect(markerX - 7f, markerY - 7f, 14f, 14f), Texture2D.whiteTexture);
+        GUI.color = minimapPlayerColor;
+        GUI.DrawTexture(new Rect(markerX - 5f, markerY - 5f, 10f, 10f), Texture2D.whiteTexture);
         GUI.EndGroup();
 
         GUI.color = Color.white;
@@ -535,6 +660,37 @@ public class SubjiRoadMap : MonoBehaviour
             minimapLabelStyle.normal.textColor = Color.white;
         }
         GUI.Label(new Rect(map.x, map.y + map.height + 2f, map.width, 22f), "MINI MAP", minimapLabelStyle);
+    }
+
+    private void DrawStageMapOnMinimap(float mapSize, float scale)
+    {
+        if (stageMapSprites == null || stageMapSprites.Length == 0)
+            RefreshStageMapSprites();
+
+        foreach (SpriteRenderer spriteRenderer in stageMapSprites)
+        {
+            if (spriteRenderer == null || !spriteRenderer.enabled ||
+                !spriteRenderer.gameObject.activeInHierarchy || spriteRenderer.sprite == null)
+                continue;
+
+            Bounds bounds = spriteRenderer.bounds;
+            float x = (bounds.min.x - center.x + fieldSize * 0.5f) * scale;
+            float y = mapSize - ((bounds.max.y - center.y + fieldSize * 0.5f) * scale);
+            float width = Mathf.Max(2f, bounds.size.x * scale);
+            float height = Mathf.Max(2f, bounds.size.y * scale);
+            GUI.color = spriteRenderer.color;
+            GUI.DrawTexture(new Rect(x, y, width, height), spriteRenderer.sprite.texture,
+                ScaleMode.ScaleToFit, true);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (minimapTexture != null)
+        {
+            minimapTexture.Release();
+            Destroy(minimapTexture);
+        }
     }
 
     private static void DrawMinimapCircle(Vector2 centerPoint, float radius)

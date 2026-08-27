@@ -55,6 +55,12 @@ public class JikkenCommentStream : MonoBehaviour
     public Color taskTextColor = new Color(1f, 0.25f, 0.25f, 1f);
     public Color panelColor = new Color(0.03f, 0.32f, 0.45f, 0.97f);
 
+    [Header("発生コメント表示")]
+    [Min(0.1f)] public float popupDuration = 3f;
+    public Vector2 popupSize = new Vector2(650f, 130f);
+    public Vector2 popupPosition = new Vector2(0f, -8f);
+    public Color popupTextColor = Color.black;
+
     [Header("枠のレイアウト")]
     [Tooltip("画面全体の端からの余白（px）")]
     [Min(0f)] public float screenMargin = 8f;
@@ -74,6 +80,9 @@ public class JikkenCommentStream : MonoBehaviour
     private readonly List<RectTransform> comments = new List<RectTransform>();
     private readonly List<AcceptedTask> acceptedTasks = new List<AcceptedTask>();
     private GameObject uiRoot;
+    private GameObject popupRoot;
+    private TextMeshProUGUI popupLabel;
+    private float popupTimer;
     private RectTransform commentContent;
     private RectTransform taskContent;
     private float timer;
@@ -90,7 +99,10 @@ public class JikkenCommentStream : MonoBehaviour
             player = playerMovement.transform;
         EnsureUiExists(false);
         if (Application.isPlaying)
+        {
             uiRoot.SetActive(false);
+            CreatePopupUi();
+        }
     }
 
     private void OnEnable()
@@ -126,16 +138,18 @@ public class JikkenCommentStream : MonoBehaviour
 
         UpdateActiveTask();
 
+        if (popupRoot != null && popupRoot.activeSelf)
+        {
+            popupTimer -= Time.deltaTime;
+            if (popupTimer <= 0f)
+                popupRoot.SetActive(false);
+        }
+
         if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
         {
             isOpen = !isOpen;
             uiRoot.SetActive(isOpen);
-            if (isOpen)
-                timer = spawnInterval;
         }
-
-        if (!isOpen)
-            return;
 
         timer += Time.deltaTime;
         if (timer >= spawnInterval)
@@ -143,6 +157,64 @@ public class JikkenCommentStream : MonoBehaviour
             timer = 0f;
             SpawnComment();
         }
+    }
+
+    private void CreatePopupUi()
+    {
+        GameObject canvasObject = new GameObject("Comment Popup Canvas", typeof(RectTransform),
+            typeof(Canvas), typeof(CanvasScaler));
+        canvasObject.transform.SetParent(transform, false);
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 110;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        popupRoot = new GameObject("Generated Comment Popup", typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(Image));
+        popupRoot.transform.SetParent(canvasObject.transform, false);
+        RectTransform popupRect = popupRoot.GetComponent<RectTransform>();
+        popupRect.anchorMin = new Vector2(0.5f, 1f);
+        popupRect.anchorMax = new Vector2(0.5f, 1f);
+        popupRect.pivot = new Vector2(0.5f, 1f);
+        popupRect.sizeDelta = popupSize;
+        popupRect.anchoredPosition = popupPosition;
+
+        Sprite[] popupSprites = Resources.LoadAll<Sprite>("comment");
+        Image image = popupRoot.GetComponent<Image>();
+        if (popupSprites.Length > 0)
+        {
+            image.sprite = popupSprites[0];
+            image.type = Image.Type.Sliced;
+            image.preserveAspect = false;
+        }
+        else
+        {
+            image.color = new Color(0f, 0f, 0f, 0.75f);
+        }
+
+        GameObject textObject = CreateTextObject("Popup Comment Text", popupRoot.transform,
+            string.Empty, fontSize, popupTextColor);
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        Stretch(textRect, 0f, 0f, 1f, 1f, 24f);
+        popupLabel = textObject.GetComponent<TextMeshProUGUI>();
+        popupLabel.textWrappingMode = TextWrappingModes.Normal;
+        popupLabel.raycastTarget = false;
+        popupRoot.SetActive(false);
+    }
+
+    private void ShowPopup(string message, Color color)
+    {
+        if (popupRoot == null || popupLabel == null)
+            return;
+
+        popupLabel.text = message;
+        popupLabel.color = color;
+        popupTimer = popupDuration;
+        popupRoot.SetActive(true);
     }
 
     private void CreateRuntimeUi()
@@ -374,6 +446,9 @@ public class JikkenCommentStream : MonoBehaviour
         {
             comment.GetComponent<TextMeshProUGUI>().raycastTarget = false;
         }
+
+        ShowPopup(comment.GetComponent<TextMeshProUGUI>().text,
+            isTask ? taskTextColor : popupTextColor);
 
         comments.Insert(0, rect);
         ArrangeComments();

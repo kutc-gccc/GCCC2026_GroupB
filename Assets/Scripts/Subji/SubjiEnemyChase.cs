@@ -13,6 +13,16 @@ public class SubjiEnemyChase : MonoBehaviour
     [Tooltip("徘徊型、発見まで停止する型、完全停止型から選びます")]
     public MovementType movementType = MovementType.PatrolAndChase;
 
+    [Header("見た目・当たり判定")]
+    [Tooltip("Resourcesから読み込む敵スプライトの名前")]
+    public string spriteResourcePath = "guard";
+    [Tooltip("敵イラストの表示倍率")]
+    public Vector2 visualScale = new Vector2(1.567f, 1.5f);
+    [Tooltip("接触判定の大きさ。敵の足元寄りに細く設定できます")]
+    public Vector2 collisionSize = new Vector2(0.52f, 0.9f);
+    [Tooltip("接触判定の中心位置")]
+    public Vector2 collisionOffset = new Vector2(0f, 0.45f);
+
     [Header("徘徊設定")]
     [Tooltip("プレイヤーを発見していない時の移動速度")]
     [Min(0f)] public float patrolSpeed = 1.5f;
@@ -43,6 +53,7 @@ public class SubjiEnemyChase : MonoBehaviour
     private LineRenderer detectionCircle;
     private SubjiPlayerMovement playerMovement;
     private SpriteRenderer enemyRenderer;
+    private BoxCollider2D contactCollider;
     private Vector2 patrolDestination;
     private float patrolWaitTimer;
     private float chaseMemoryTimer;
@@ -58,12 +69,61 @@ public class SubjiEnemyChase : MonoBehaviour
         }
     }
 
+    void Awake()
+    {
+        ApplyAppearanceAndCollider();
+    }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        ApplyAppearanceAndCollider();
+    }
+#endif
+
+    public void ApplyAppearanceAndCollider()
+    {
+        enemyRenderer = GetComponent<SpriteRenderer>();
+        if (enemyRenderer == null)
+            enemyRenderer = gameObject.AddComponent<SpriteRenderer>();
+
+        if (!string.IsNullOrWhiteSpace(spriteResourcePath))
+        {
+            Sprite[] sprites = Resources.LoadAll<Sprite>(spriteResourcePath);
+            if (sprites.Length > 0)
+                enemyRenderer.sprite = sprites[0];
+        }
+
+        enemyRenderer.color = Color.white;
+        transform.localScale = new Vector3(
+            Mathf.Max(0.01f, visualScale.x),
+            Mathf.Max(0.01f, visualScale.y), 1f);
+
+        contactCollider = GetComponent<BoxCollider2D>();
+        if (contactCollider == null)
+            contactCollider = gameObject.AddComponent<BoxCollider2D>();
+        contactCollider.isTrigger = true;
+        contactCollider.size = new Vector2(
+            Mathf.Max(0.01f, collisionSize.x),
+            Mathf.Max(0.01f, collisionSize.y));
+        contactCollider.offset = collisionOffset;
+    }
+
+    public Bounds GetContactBounds()
+    {
+        if (contactCollider == null)
+            contactCollider = GetComponent<BoxCollider2D>();
+        return contactCollider != null
+            ? contactCollider.bounds
+            : (enemyRenderer != null ? enemyRenderer.bounds : new Bounds(transform.position, Vector3.zero));
+    }
+
     void Start()
     {
         if (player != null)
             playerMovement = player.GetComponent<SubjiPlayerMovement>();
 
-        enemyRenderer = GetComponent<SpriteRenderer>();
+        ApplyAppearanceAndCollider();
 
         if (roadMap == null)
             roadMap = FindFirstObjectByType<SubjiRoadMap>();

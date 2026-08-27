@@ -91,6 +91,10 @@ public class SubjiEnemySpawner : MonoBehaviour
 
         SubjiEnemyChase chase = enemy.AddComponent<SubjiEnemyChase>();
         chase.movementType = enemyTemplate.movementType;
+        chase.spriteResourcePath = enemyTemplate.spriteResourcePath;
+        chase.visualScale = enemyTemplate.visualScale;
+        chase.collisionSize = enemyTemplate.collisionSize;
+        chase.collisionOffset = enemyTemplate.collisionOffset;
         chase.patrolSpeed = enemyTemplate.patrolSpeed;
         chase.minimumPatrolWait = enemyTemplate.minimumPatrolWait;
         chase.maximumPatrolWait = enemyTemplate.maximumPatrolWait;
@@ -101,6 +105,7 @@ public class SubjiEnemySpawner : MonoBehaviour
         chase.circleWidth = enemyTemplate.circleWidth;
         chase.player = player;
         chase.roadMap = roadMap;
+        chase.ApplyAppearanceAndCollider();
 
         if (randomizeEnemyVariation)
         {

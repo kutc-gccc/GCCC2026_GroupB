@@ -50,10 +50,19 @@ public class SubjiEnemyChase : MonoBehaviour
     [Header("Detection Circle Appearance")]
     [Range(0.01f, 0.5f)] public float circleWidth = 0.12f;
 
+    [Header("仮の正面視野（実験機能）")]
+    [Tooltip("オフにすると扇形の表示と発見判定をまとめて無効にします")]
+    public bool useTemporaryVisionCone = true;
+    [Tooltip("扇形の端から端までの角度")]
+    [Range(1f, 180f)] public float temporaryVisionAngle = 30f;
+    [Tooltip("扇形の長さ。移動中の索敵半径より少し大きい値を推奨します")]
+    [Min(0.1f)] public float temporaryVisionDistance = 5.5f;
+
     private LineRenderer detectionCircle;
     private SubjiPlayerMovement playerMovement;
     private SpriteRenderer enemyRenderer;
     private BoxCollider2D contactCollider;
+    private SubjiEnemyVisionCone visionCone;
     private Vector2 patrolDestination;
     private float patrolWaitTimer;
     private float chaseMemoryTimer;
@@ -135,6 +144,7 @@ public class SubjiEnemyChase : MonoBehaviour
         }
 
         CreateDetectionCircle();
+        CreateTemporaryVisionCone();
         ChooseNextPatrolDestination();
     }
 
@@ -148,12 +158,14 @@ public class SubjiEnemyChase : MonoBehaviour
         UpdateDetectionCircle(activeRadius);
 
         float distance = Vector2.Distance(transform.position, player.position);
-        if (distance <= activeRadius)
+        bool isInsideVisionCone = visionCone != null &&
+            visionCone.isActiveAndEnabled && visionCone.Contains(player.position);
+        if (distance <= activeRadius || isInsideVisionCone)
             chaseMemoryTimer = chaseMemorySeconds;
         else
             chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
 
-        bool isChasing = distance <= activeRadius || chaseMemoryTimer > 0f;
+        bool isChasing = distance <= activeRadius || isInsideVisionCone || chaseMemoryTimer > 0f;
         if (isChasing && movementType != MovementType.CompletelyStationary)
         {
             MoveAlongRoad(player.position, chaseSpeed);
@@ -232,6 +244,23 @@ public class SubjiEnemyChase : MonoBehaviour
         detectionCircle.material = new Material(Shader.Find("Sprites/Default"));
 
         UpdateDetectionCircle(idleDetectionRadius);
+    }
+
+    void CreateTemporaryVisionCone()
+    {
+        visionCone = GetComponent<SubjiEnemyVisionCone>();
+        if (!useTemporaryVisionCone)
+        {
+            if (visionCone != null)
+                visionCone.enabled = false;
+            return;
+        }
+
+        if (visionCone == null)
+            visionCone = gameObject.AddComponent<SubjiEnemyVisionCone>();
+        visionCone.viewAngle = temporaryVisionAngle;
+        visionCone.viewDistance = temporaryVisionDistance;
+        visionCone.enabled = true;
     }
 
     void UpdateDetectionCircle(float radius)

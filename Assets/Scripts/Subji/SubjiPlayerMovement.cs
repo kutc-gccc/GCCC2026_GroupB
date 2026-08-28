@@ -115,6 +115,8 @@ public class SubjiPlayerMovement : MonoBehaviour
         transform.position = roadMap.GetClosestPointOnRoad(transform.position,
             playerRenderer != null ? playerRenderer.bounds.extents : Vector2.zero);
         CreateEnemy();
+        if (GetComponent<SubjiGameClearGoal>() == null)
+            gameObject.AddComponent<SubjiGameClearGoal>();
         CreateSpeedBoostGauge();
         CreateDarknessOverlay();
 

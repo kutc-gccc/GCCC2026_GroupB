@@ -103,6 +103,9 @@ public class SubjiEnemySpawner : MonoBehaviour
         chase.chaseSpeed = enemyTemplate.chaseSpeed;
         chase.chaseMemorySeconds = enemyTemplate.chaseMemorySeconds;
         chase.circleWidth = enemyTemplate.circleWidth;
+        chase.useTemporaryVisionCone = enemyTemplate.useTemporaryVisionCone;
+        chase.temporaryVisionAngle = enemyTemplate.temporaryVisionAngle;
+        chase.temporaryVisionDistance = enemyTemplate.temporaryVisionDistance;
         chase.player = player;
         chase.roadMap = roadMap;
         chase.ApplyAppearanceAndCollider();

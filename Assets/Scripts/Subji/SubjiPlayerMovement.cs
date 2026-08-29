@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -65,8 +64,15 @@ public class SubjiPlayerMovement : MonoBehaviour
     public Vector2 enemySpawnOffset = new Vector2(10f, 0f);
 
     [Header("敵との接触判定")]
-    [Tooltip("プレイヤーの何割が敵と重なったら接触として数えるか。0.3は30%です")]
+    [Tooltip("プレイヤーの何割が敵と重なったらゲームオーバーにするか。0.3は30%です")]
     [Range(0.01f, 1f)] public float enemyOverlapThreshold = 0.3f;
+
+    [Header("登録者数")]
+    [Tooltip("1秒ごとに増える登録者数")]
+    [Min(0)] public int subscribersPerSecond = 2;
+
+    [Tooltip("タスクを1つ完了したときに増える登録者数")]
+    [Min(0)] public int subscribersPerCompletedTask = 100;
 
     private Rigidbody2D rb;
     private SpriteRenderer playerRenderer;
@@ -75,8 +81,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     private GUIStyle coordinateStyle;
     private Vector2 fieldCenter;
     private SubjiRoadMap roadMap;
-    private readonly HashSet<int> touchingEnemyIds = new HashSet<int>();
-    private readonly HashSet<int> checkedEnemyIds = new HashSet<int>();
+    private float subscriberGrowthTimer;
     private Transform speedBoostGaugeRoot;
     private Transform speedBoostGaugeFill;
     private float speedBoostAmount = 1f;
@@ -89,8 +94,8 @@ public class SubjiPlayerMovement : MonoBehaviour
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public bool IsSpeedBoosting { get; private set; }
     public float SpeedBoostAmount => speedBoostAmount;
-    public int EnemyContactCount { get; private set; }
-    public event Action<int> EnemyContactCountChanged;
+    public int SubscriberCount { get; private set; }
+    public event Action<int> SubscriberCountChanged;
 
     void Awake()
     {
@@ -159,6 +164,32 @@ public class SubjiPlayerMovement : MonoBehaviour
             UpdateDarknessVisibility();
         }
         UpdateSpeedBoost();
+        UpdateSubscriberGrowth();
+    }
+
+    void UpdateSubscriberGrowth()
+    {
+        subscriberGrowthTimer += Time.deltaTime;
+        int elapsedSeconds = Mathf.FloorToInt(subscriberGrowthTimer);
+        if (elapsedSeconds <= 0)
+            return;
+
+        subscriberGrowthTimer -= elapsedSeconds;
+        AddSubscribers(elapsedSeconds * subscribersPerSecond);
+    }
+
+    public void CompleteTask()
+    {
+        AddSubscribers(subscribersPerCompletedTask);
+    }
+
+    private void AddSubscribers(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        SubscriberCount += amount;
+        SubscriberCountChanged?.Invoke(SubscriberCount);
     }
 
     void CreateDarknessOverlay()
@@ -310,13 +341,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void LateUpdate()
     {
-        if (Application.isPlaying)
-            UpdateEnemyContacts();
-    }
-
-    void UpdateEnemyContacts()
-    {
-        if (playerRenderer == null)
+        if (!Application.isPlaying || playerRenderer == null)
             return;
 
         Bounds playerBounds = playerRenderer.bounds;
@@ -324,34 +349,24 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (playerArea <= Mathf.Epsilon)
             return;
 
-        checkedEnemyIds.Clear();
         SubjiEnemyChase[] enemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None);
         foreach (SubjiEnemyChase enemy in enemies)
         {
             if (enemy == null)
                 continue;
 
-            int id = enemy.GetInstanceID();
-            checkedEnemyIds.Add(id);
             Bounds enemyBounds = enemy.GetContactBounds();
-            bool isTouching = enemyBounds.size.sqrMagnitude > 0f &&
-                GetOverlapArea(playerBounds, enemyBounds) / playerArea >= enemyOverlapThreshold;
+            if (enemyBounds.size.sqrMagnitude <= 0f ||
+                GetOverlapArea(playerBounds, enemyBounds) / playerArea < enemyOverlapThreshold)
+            {
+                continue;
+            }
 
-            if (isTouching)
-            {
-                if (touchingEnemyIds.Add(id))
-                {
-                    EnemyContactCount++;
-                    EnemyContactCountChanged?.Invoke(EnemyContactCount);
-                }
-            }
-            else
-            {
-                touchingEnemyIds.Remove(id);
-            }
+            SubjiGameClearGoal gameEnd = GetComponent<SubjiGameClearGoal>();
+            if (gameEnd != null)
+                gameEnd.GameOver();
+            return;
         }
-
-        touchingEnemyIds.RemoveWhere(id => !checkedEnemyIds.Contains(id));
     }
 
     static float GetOverlapArea(Bounds a, Bounds b)
@@ -432,7 +447,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.7f);
         GUI.Box(new Rect(10f, 70f, 210f, 48f), GUIContent.none);
         GUI.color = Color.white;
-        GUI.Label(new Rect(20f, 77f, 190f, 34f), $"HIT: {EnemyContactCount}", coordinateStyle);
+        GUI.Label(new Rect(20f, 77f, 190f, 34f), $"登録者: {SubscriberCount}", coordinateStyle);
 
         GUI.color = new Color(0f, 0f, 0f, 0.7f);
         GUI.Box(new Rect(10f, 126f, 275f, 48f), GUIContent.none);

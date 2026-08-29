@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 public static class SubjiStageMapMigration
 {
@@ -9,6 +10,60 @@ public static class SubjiStageMapMigration
     private const string TargetPath = "Assets/Scenes/subji/jikkennsupace.unity";
     private const string MapRootName = "Stage Map (from stagen)";
     private const string SpriteMaterialPath = "Assets/Materials/SubjiStageSprite.mat";
+
+    [MenuItem("Tools/Subji/Create Invisible Wall Prefab")]
+    public static void CreateInvisibleWallPrefab()
+    {
+        // Restore the Tilemap setup used before the paintable-wall experiment.
+        foreach (Tilemap tilemap in Object.FindObjectsByType<Tilemap>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (!tilemap.name.Equals("wall", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            TilemapCollider2D collider = tilemap.GetComponent<TilemapCollider2D>();
+            if (collider != null)
+                Object.DestroyImmediate(collider);
+        }
+
+        string[] stairTilePaths =
+        {
+            "Assets/Tile/stairC.asset",
+            "Assets/Tile/stairL.asset",
+            "Assets/Tile/stairR.asset",
+            "Assets/Tile/stairU.asset",
+            "Assets/Tile/stairUL.asset",
+            "Assets/Tile/stairUR.asset"
+        };
+
+        foreach (string path in stairTilePaths)
+        {
+            Tile stairTile = AssetDatabase.LoadAssetAtPath<Tile>(path);
+            if (stairTile == null)
+                continue;
+
+            stairTile.colliderType = Tile.ColliderType.Sprite;
+            EditorUtility.SetDirty(stairTile);
+        }
+
+        const string prefabFolder = "Assets/Prefabs";
+        const string prefabPath = prefabFolder + "/InvisibleWall2D.prefab";
+        if (!AssetDatabase.IsValidFolder(prefabFolder))
+            AssetDatabase.CreateFolder("Assets", "Prefabs");
+
+        GameObject wall = new GameObject("Invisible Wall 2D");
+        BoxCollider2D boxCollider = wall.AddComponent<BoxCollider2D>();
+        boxCollider.size = new Vector2(4f, 1f);
+        wall.AddComponent<InvisibleWall2D>();
+        PrefabUtility.SaveAsPrefabAsset(wall, prefabPath);
+        Object.DestroyImmediate(wall);
+
+        AssetDatabase.SaveAssets();
+        EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        EditorSceneManager.SaveOpenScenes();
+        Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        Debug.Log("Restored the wall Tilemap settings and created Assets/Prefabs/InvisibleWall2D.prefab.");
+    }
 
     [MenuItem("Tools/Subji/Replace Map With Stage")]
     public static void ReplaceMap()

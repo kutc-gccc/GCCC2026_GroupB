@@ -89,12 +89,13 @@ public class JikkenCommentStream : MonoBehaviour
     private bool isOpen;
     private SubjiRoadMap roadMap;
     private Transform player;
+    private SubjiPlayerMovement playerMovement;
     private AcceptedTask selectedTask;
 
     private void Awake()
     {
         roadMap = FindFirstObjectByType<SubjiRoadMap>();
-        SubjiPlayerMovement playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+        playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
         if (playerMovement != null)
             player = playerMovement.transform;
         EnsureUiExists(false);
@@ -549,6 +550,7 @@ public class JikkenCommentStream : MonoBehaviour
         if (Vector2.Distance(player.position, selectedTask.destination) > taskArrivalDistance)
             return;
 
+        playerMovement.CompleteTask();
         roadMap.ClearTaskDestination();
         acceptedTasks.Remove(selectedTask);
         if (selectedTask.rect != null)

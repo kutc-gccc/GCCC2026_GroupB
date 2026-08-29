@@ -22,8 +22,10 @@ public class SubjiGameClearGoal : MonoBehaviour
     private GUIStyle clearStyle;
     private GUIStyle restartStyle;
     private bool isClear;
+    private bool isGameOver;
 
     public bool IsClear => isClear;
+    public bool IsGameOver => isGameOver;
 
     private void Awake()
     {
@@ -33,7 +35,7 @@ public class SubjiGameClearGoal : MonoBehaviour
 
     private void Update()
     {
-        if (isClear || goalRenderer == null)
+        if (isClear || isGameOver || goalRenderer == null)
             return;
 
         bool isTouching = playerRenderer != null
@@ -70,6 +72,21 @@ public class SubjiGameClearGoal : MonoBehaviour
     {
         isClear = true;
 
+        StopGame();
+    }
+
+    public void GameOver()
+    {
+        if (isClear || isGameOver)
+            return;
+
+        isGameOver = true;
+        StopGame();
+    }
+
+    private void StopGame()
+    {
+
         SubjiPlayerMovement movement = GetComponent<SubjiPlayerMovement>();
         if (movement != null)
             movement.enabled = false;
@@ -86,7 +103,7 @@ public class SubjiGameClearGoal : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!isClear)
+        if (!isClear && !isGameOver)
             return;
 
         if (clearStyle == null)
@@ -109,7 +126,7 @@ public class SubjiGameClearGoal : MonoBehaviour
         float centerX = Screen.width * 0.5f;
         float centerY = Screen.height * 0.5f;
         GUI.Label(new Rect(centerX - 240f, centerY - 130f, 480f, 100f),
-            "CLEAR", clearStyle);
+            isGameOver ? "GAME OVER" : "CLEAR", clearStyle);
 
         if (GUI.Button(new Rect(centerX - 110f, centerY + 10f, 220f, 64f),
             "Restart", restartStyle))

@@ -22,6 +22,9 @@ public class SubjiEnemyVisionCone : MonoBehaviour
     private MeshRenderer viewRenderer;
     private Transform visualTransform;
     private Vector3 previousPosition;
+    private Vector2 lastMeshDirection;
+    private Vector3[] meshVertices;
+    private int[] meshTriangles;
 
     private void Awake()
     {
@@ -36,8 +39,8 @@ public class SubjiEnemyVisionCone : MonoBehaviour
             FacingDirection = movement.normalized;
 
         previousPosition = transform.position;
-        KeepVisualAtWorldScale();
-        UpdateMesh();
+        if ((FacingDirection - lastMeshDirection).sqrMagnitude > 0.0001f)
+            UpdateMesh();
     }
 
     private void OnEnable()
@@ -96,29 +99,32 @@ public class SubjiEnemyVisionCone : MonoBehaviour
             return;
 
         int safeSegments = Mathf.Max(2, segments);
-        Vector3[] vertices = new Vector3[safeSegments + 2];
-        int[] triangles = new int[safeSegments * 3];
-        vertices[0] = Vector3.zero;
+        if (meshVertices == null || meshVertices.Length != safeSegments + 2)
+            meshVertices = new Vector3[safeSegments + 2];
+        if (meshTriangles == null || meshTriangles.Length != safeSegments * 3)
+            meshTriangles = new int[safeSegments * 3];
+        meshVertices[0] = Vector3.zero;
 
         float facingAngle = Mathf.Atan2(FacingDirection.y, FacingDirection.x) * Mathf.Rad2Deg;
         for (int i = 0; i <= safeSegments; i++)
         {
             float angle = facingAngle - viewAngle * 0.5f + viewAngle * i / safeSegments;
             float radians = angle * Mathf.Deg2Rad;
-            vertices[i + 1] = new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f) * viewDistance;
+            meshVertices[i + 1] = new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f) * viewDistance;
 
             if (i >= safeSegments)
                 continue;
             int triangle = i * 3;
-            triangles[triangle] = 0;
-            triangles[triangle + 1] = i + 1;
-            triangles[triangle + 2] = i + 2;
+            meshTriangles[triangle] = 0;
+            meshTriangles[triangle + 1] = i + 1;
+            meshTriangles[triangle + 2] = i + 2;
         }
 
         viewMesh.Clear();
-        viewMesh.vertices = vertices;
-        viewMesh.triangles = triangles;
+        viewMesh.vertices = meshVertices;
+        viewMesh.triangles = meshTriangles;
         viewMesh.RecalculateBounds();
+        lastMeshDirection = FacingDirection;
 
         if (viewRenderer != null)
             viewRenderer.material.color = viewColor;

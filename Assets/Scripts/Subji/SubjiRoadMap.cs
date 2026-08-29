@@ -624,9 +624,8 @@ public class SubjiRoadMap : MonoBehaviour
                 Texture2D.whiteTexture);
         }
 
-        SubjiEnemyChase[] enemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None);
         GUI.color = minimapEnemyColor;
-        foreach (SubjiEnemyChase enemy in enemies)
+        foreach (SubjiEnemyChase enemy in SubjiEnemyChase.ActiveEnemies)
         {
             Vector2 enemyLocal = (Vector2)enemy.transform.position - center;
             float enemyX = (enemyLocal.x + fieldSize * 0.5f) * scale;

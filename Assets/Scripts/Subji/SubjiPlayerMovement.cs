@@ -344,13 +344,13 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (!Application.isPlaying || playerRenderer == null)
             return;
 
-        Bounds playerBounds = playerRenderer.bounds;
+        Collider2D playerCollider = GetComponent<Collider2D>();
+        Bounds playerBounds = playerCollider != null ? playerCollider.bounds : playerRenderer.bounds;
         float playerArea = playerBounds.size.x * playerBounds.size.y;
         if (playerArea <= Mathf.Epsilon)
             return;
 
-        SubjiEnemyChase[] enemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None);
-        foreach (SubjiEnemyChase enemy in enemies)
+        foreach (SubjiEnemyChase enemy in SubjiEnemyChase.ActiveEnemies)
         {
             if (enemy == null)
                 continue;

@@ -70,7 +70,7 @@ public class SubjiEnemySpawner : MonoBehaviour
         if (remainingTime <= 0f)
             remainingTime = spawnInterval;
 
-        if (maximumEnemies <= 0 || FindObjectsByType<SubjiEnemyChase>(FindObjectsSortMode.None).Length < maximumEnemies)
+        if (maximumEnemies <= 0 || SubjiEnemyChase.ActiveEnemies.Count < maximumEnemies)
             SpawnEnemy();
     }
 

@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 [CustomEditor(typeof(SceneRuler2D))]
@@ -84,6 +85,8 @@ public sealed class SceneRuler2DEditor : Editor
             Mathf.Max(Mathf.Abs(b.x - a.x), 0.1f),
             Mathf.Max(Mathf.Abs(b.y - a.y), 0.1f));
         Selection.activeGameObject = wall;
+        EditorSceneManager.MarkSceneDirty(wall.scene);
+        EditorSceneManager.SaveScene(wall.scene);
     }
 
     [MenuItem("GameObject/2D Object/Scene Ruler", false, 20)]

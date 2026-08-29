@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class SubjiEnemyChase : MonoBehaviour
 {
+    public static readonly HashSet<SubjiEnemyChase> ActiveEnemies = new();
     public enum MovementType
     {
         PatrolAndChase,
@@ -19,9 +21,9 @@ public class SubjiEnemyChase : MonoBehaviour
     [Tooltip("敵イラストの表示倍率")]
     public Vector2 visualScale = new Vector2(1.567f, 1.5f);
     [Tooltip("接触判定の大きさ。敵の足元寄りに細く設定できます")]
-    public Vector2 collisionSize = new Vector2(0.52f, 0.9f);
+    public Vector2 collisionSize = new Vector2(0.33333334f, 0.33333334f);
     [Tooltip("接触判定の中心位置")]
-    public Vector2 collisionOffset = new Vector2(0f, 0.45f);
+    public Vector2 collisionOffset = Vector2.zero;
 
     [Header("徘徊設定")]
     [Tooltip("プレイヤーを発見していない時の移動速度")]
@@ -67,7 +69,14 @@ public class SubjiEnemyChase : MonoBehaviour
     private float patrolWaitTimer;
     private float chaseMemoryTimer;
     private bool hasPatrolDestination;
-    private const int CircleSegments = 96;
+    private Vector2 cachedObstacleWaypoint;
+    private Vector2 cachedPathGoal;
+    private float nextPathRefreshTime;
+    private static InvisibleWall2D[] cachedWalls;
+    private static float nextWallCacheRefreshTime;
+    private const int CircleSegments = 32;
+    private Vector3 lastCirclePosition = new(float.PositiveInfinity, 0f, 0f);
+    private float lastCircleRadius = -1f;
 
     public float CurrentDetectionRadius
     {
@@ -104,6 +113,8 @@ public class SubjiEnemyChase : MonoBehaviour
         }
 
         enemyRenderer.color = Color.white;
+        enemyRenderer.sortingLayerName = "Player";
+        enemyRenderer.sortingOrder = 90;
         transform.localScale = new Vector3(
             Mathf.Max(0.01f, visualScale.x),
             Mathf.Max(0.01f, visualScale.y), 1f);
@@ -116,6 +127,7 @@ public class SubjiEnemyChase : MonoBehaviour
             Mathf.Max(0.01f, collisionSize.x),
             Mathf.Max(0.01f, collisionSize.y));
         contactCollider.offset = collisionOffset;
+
     }
 
     public Bounds GetContactBounds()
@@ -222,6 +234,13 @@ public class SubjiEnemyChase : MonoBehaviour
         Vector2 pathPoint = roadMap != null
             ? roadMap.GetShortestPathPoint(currentPosition, reachableDestination, extents)
             : reachableDestination;
+        if (Time.time >= nextPathRefreshTime || Vector2.Distance(cachedPathGoal, pathPoint) > 0.5f)
+        {
+            cachedPathGoal = pathPoint;
+            cachedObstacleWaypoint = GetObstacleWaypoint(currentPosition, pathPoint, extents);
+            nextPathRefreshTime = Time.time + 0.25f;
+        }
+        pathPoint = cachedObstacleWaypoint;
         Vector2 desiredPosition = Vector2.MoveTowards(currentPosition, pathPoint,
             speed * Time.deltaTime);
 
@@ -229,6 +248,85 @@ public class SubjiEnemyChase : MonoBehaviour
             desiredPosition = roadMap.ConstrainToRoad(currentPosition, desiredPosition, extents);
 
         transform.position = desiredPosition;
+    }
+
+    void OnEnable() => ActiveEnemies.Add(this);
+    void OnDisable() => ActiveEnemies.Remove(this);
+
+    static Vector2 GetObstacleWaypoint(Vector2 start, Vector2 goal, Vector2 extents)
+    {
+        if (cachedWalls == null || Time.time >= nextWallCacheRefreshTime)
+        {
+            cachedWalls = FindObjectsByType<InvisibleWall2D>(FindObjectsSortMode.None);
+            nextWallCacheRefreshTime = Time.time + 1f;
+        }
+        if (cachedWalls.Length == 0)
+            return goal;
+
+        List<Bounds> obstacles = new();
+        List<Vector2> nodes = new() { start, goal };
+        foreach (InvisibleWall2D wall in cachedWalls)
+        {
+            BoxCollider2D box = wall.GetComponent<BoxCollider2D>();
+            if (box == null || !box.enabled)
+                continue;
+            Bounds bounds = box.bounds;
+            bounds.Expand(new Vector3(extents.x * 2f + 0.12f, extents.y * 2f + 0.12f));
+            obstacles.Add(bounds);
+            const float cornerGap = 0.03f;
+            nodes.Add(new Vector2(bounds.min.x - cornerGap, bounds.min.y - cornerGap));
+            nodes.Add(new Vector2(bounds.min.x - cornerGap, bounds.max.y + cornerGap));
+            nodes.Add(new Vector2(bounds.max.x + cornerGap, bounds.min.y - cornerGap));
+            nodes.Add(new Vector2(bounds.max.x + cornerGap, bounds.max.y + cornerGap));
+        }
+
+        if (SegmentIsClear(start, goal, obstacles))
+            return goal;
+
+        int count = nodes.Count;
+        float[] distance = new float[count];
+        int[] previous = new int[count];
+        bool[] visited = new bool[count];
+        for (int i = 0; i < count; i++) { distance[i] = float.PositiveInfinity; previous[i] = -1; }
+        distance[0] = 0f;
+
+        for (int step = 0; step < count; step++)
+        {
+            int current = -1;
+            for (int i = 0; i < count; i++)
+                if (!visited[i] && (current < 0 || distance[i] < distance[current])) current = i;
+            if (current < 0 || float.IsInfinity(distance[current]) || current == 1) break;
+            visited[current] = true;
+            for (int next = 0; next < count; next++)
+            {
+                if (next == current || visited[next] || !SegmentIsClear(nodes[current], nodes[next], obstacles))
+                    continue;
+                float candidate = distance[current] + Vector2.Distance(nodes[current], nodes[next]);
+                if (candidate < distance[next]) { distance[next] = candidate; previous[next] = current; }
+            }
+        }
+
+        if (previous[1] < 0)
+            return start;
+        int waypoint = 1;
+        while (previous[waypoint] > 0) waypoint = previous[waypoint];
+        return nodes[waypoint];
+    }
+
+    static bool SegmentIsClear(Vector2 from, Vector2 to, List<Bounds> obstacles)
+    {
+        foreach (Bounds bounds in obstacles)
+        {
+            if (bounds.Contains(from) || bounds.Contains(to))
+                continue;
+            Vector2 direction = to - from;
+            float length = direction.magnitude;
+            if (length <= 0.001f) continue;
+            Ray ray = new(from, direction / length);
+            if (bounds.IntersectRay(ray, out float hitDistance) && hitDistance < length)
+                return false;
+        }
+        return true;
     }
 
     void CreateDetectionCircle()
@@ -265,6 +363,12 @@ public class SubjiEnemyChase : MonoBehaviour
 
     void UpdateDetectionCircle(float radius)
     {
+        if ((transform.position - lastCirclePosition).sqrMagnitude < 0.0025f &&
+            Mathf.Abs(radius - lastCircleRadius) < 0.01f)
+            return;
+        lastCirclePosition = transform.position;
+        lastCircleRadius = radius;
+
         detectionCircle.startWidth = circleWidth;
         detectionCircle.endWidth = circleWidth;
 

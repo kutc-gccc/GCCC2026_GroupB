@@ -46,10 +46,10 @@ public static class SubjiStageMapMigration
             EditorUtility.SetDirty(stairTile);
         }
 
-        const string prefabFolder = "Assets/Prefabs";
+        const string prefabFolder = "Assets/Prefabs/MapObjects";
         const string prefabPath = prefabFolder + "/InvisibleWall2D.prefab";
         if (!AssetDatabase.IsValidFolder(prefabFolder))
-            AssetDatabase.CreateFolder("Assets", "Prefabs");
+            AssetDatabase.CreateFolder("Assets/Prefabs", "MapObjects");
 
         GameObject wall = new GameObject("Invisible Wall 2D");
         BoxCollider2D boxCollider = wall.AddComponent<BoxCollider2D>();
@@ -62,7 +62,7 @@ public static class SubjiStageMapMigration
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
         EditorSceneManager.SaveOpenScenes();
         Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        Debug.Log("Restored the wall Tilemap settings and created Assets/Prefabs/InvisibleWall2D.prefab.");
+        Debug.Log($"Restored the wall Tilemap settings and created {prefabPath}.");
     }
 
     [MenuItem("Tools/Subji/Replace Map With Stage")]

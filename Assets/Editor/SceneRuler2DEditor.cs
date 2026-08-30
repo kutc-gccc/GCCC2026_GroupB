@@ -54,7 +54,7 @@ public sealed class SceneRuler2DEditor : Editor
 
     private static void CreateWall(SceneRuler2D ruler, Vector3 a, Vector3 b)
     {
-        const string prefabPath = "Assets/Prefabs/InvisibleWall2D.prefab";
+        const string prefabPath = "Assets/Prefabs/MapObjects/InvisibleWall2D.prefab";
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (prefab == null)
         {

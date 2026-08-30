@@ -102,6 +102,7 @@ GameObject:
   - component: {fileID: 6426397499637163113}
   - component: {fileID: 329587842055874392}
   - component: {fileID: 741852963014785236}
+  - component: {fileID: 852963741026395147}
   m_Layer: 0
   m_Name: BushObject
   m_TagString: Untagged
@@ -189,3 +190,18 @@ MonoBehaviour:
   colliderHeightRatio: 0.5
   targetRenderer: {fileID: 930313865925577761}
   targetCollider: {fileID: 329587842055874392}
+--- !u!114 &852963741026395147
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6628455461408327839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1685d99780342aaa9b67c31a712fbed, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::BushHideSpot2D
+  interactKey: 19
+  interactionDistance: 1.5
+  hidingPositionOffset: {x: 0, y: 0.5}

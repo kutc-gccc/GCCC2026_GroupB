@@ -169,6 +169,14 @@ public class SubjiEnemyChase : MonoBehaviour
 
         UpdateDetectionCircle(activeRadius);
 
+        if (playerMovement != null && playerMovement.IsHidden)
+        {
+            chaseMemoryTimer = 0f;
+            if (movementType == MovementType.PatrolAndChase)
+                UpdatePatrol();
+            return;
+        }
+
         float distance = Vector2.Distance(transform.position, player.position);
         bool isInsideVisionCone = visionCone != null &&
             visionCone.isActiveAndEnabled && visionCone.Contains(player.position);

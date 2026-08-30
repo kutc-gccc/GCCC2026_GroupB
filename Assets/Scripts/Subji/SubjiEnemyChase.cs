@@ -255,7 +255,8 @@ public class SubjiEnemyChase : MonoBehaviour
 
     static Vector2 GetObstacleWaypoint(Vector2 start, Vector2 goal, Vector2 extents)
     {
-        if (cachedWalls == null || Time.time >= nextWallCacheRefreshTime)
+        if (cachedWalls == null || Time.time >= nextWallCacheRefreshTime ||
+            System.Array.Exists(cachedWalls, wall => wall == null))
         {
             cachedWalls = FindObjectsByType<InvisibleWall2D>(FindObjectsSortMode.None);
             nextWallCacheRefreshTime = Time.time + 1f;
@@ -267,6 +268,9 @@ public class SubjiEnemyChase : MonoBehaviour
         List<Vector2> nodes = new() { start, goal };
         foreach (InvisibleWall2D wall in cachedWalls)
         {
+            if (wall == null)
+                continue;
+
             BoxCollider2D box = wall.GetComponent<BoxCollider2D>();
             if (box == null || !box.enabled)
                 continue;

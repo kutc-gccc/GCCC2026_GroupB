@@ -211950,8 +211950,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a268456f93d951745b88787a80104004, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SceneRuler2D
-  pointA: {x: 4.1354976, y: 13.905199}
-  pointB: {x: 3.8484092, y: 13.697726}
+  pointA: {x: -1.4682924, y: 11.720666}
+  pointB: {x: 1.364372, y: 14.52834}
 --- !u!4 &2066095852
 Transform:
   m_ObjectHideFlags: 0

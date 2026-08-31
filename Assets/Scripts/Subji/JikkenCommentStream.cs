@@ -24,9 +24,6 @@ public class JikkenCommentStream : MonoBehaviour
         public Vector2 destination;
     }
 
-    [Header("開閉設定")]
-    public Key toggleKey = Key.T;
-
     [Header("通常コメント")]
     public string[] words = { "ああああ", "いいいいい", "ううううう" };
 
@@ -139,17 +136,23 @@ public class JikkenCommentStream : MonoBehaviour
 
         UpdateActiveTask();
 
+        if (isOpen && Mouse.current != null &&
+            Mouse.current.rightButton.wasPressedThisFrame)
+        {
+            CloseCommentScreen();
+        }
+
         if (popupRoot != null && popupRoot.activeSelf)
         {
+            if (isOpen)
+            {
+                popupRoot.SetActive(false);
+                popupTimer = 0f;
+            }
+
             popupTimer -= Time.deltaTime;
             if (popupTimer <= 0f)
                 popupRoot.SetActive(false);
-        }
-
-        if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
-        {
-            isOpen = !isOpen;
-            uiRoot.SetActive(isOpen);
         }
 
         timer += Time.deltaTime;
@@ -158,6 +161,43 @@ public class JikkenCommentStream : MonoBehaviour
             timer = 0f;
             SpawnComment();
         }
+    }
+
+    public void ToggleCommentScreen()
+    {
+        if (uiRoot == null)
+            EnsureUiExists(false);
+
+        isOpen = !isOpen;
+        uiRoot.SetActive(isOpen);
+
+        if (isOpen && popupRoot != null)
+        {
+            popupRoot.SetActive(false);
+            popupTimer = 0f;
+        }
+    }
+
+    public void OpenCommentScreen()
+    {
+        if (uiRoot == null)
+            EnsureUiExists(false);
+
+        isOpen = true;
+        uiRoot.SetActive(true);
+
+        if (popupRoot != null)
+        {
+            popupRoot.SetActive(false);
+            popupTimer = 0f;
+        }
+    }
+
+    public void CloseCommentScreen()
+    {
+        isOpen = false;
+        if (uiRoot != null)
+            uiRoot.SetActive(false);
     }
 
     private void CreatePopupUi()
@@ -209,7 +249,7 @@ public class JikkenCommentStream : MonoBehaviour
 
     private void ShowPopup(string message, Color color)
     {
-        if (popupRoot == null || popupLabel == null)
+        if (isOpen || popupRoot == null || popupLabel == null)
             return;
 
         popupLabel.text = message;

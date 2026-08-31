@@ -90,11 +90,14 @@ public class SubjiPlayerMovement : MonoBehaviour
     private static Sprite gaugeSprite;
     private GameObject darknessOverlay;
     private Texture2D darknessTexture;
+    private float staminaFreezeEndTime;
+    private Color staminaFreezeGaugeColor;
 
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public bool IsHidden { get; private set; }
     public bool IsSpeedBoosting { get; private set; }
     public float SpeedBoostAmount => speedBoostAmount;
+    public bool IsStaminaFrozen => Time.time < staminaFreezeEndTime;
     public int SubscriberCount { get; private set; }
     public event Action<int> SubscriberCountChanged;
 
@@ -265,10 +268,13 @@ public class SubjiPlayerMovement : MonoBehaviour
 
         if (IsSpeedBoosting)
         {
-            speedBoostAmount = Mathf.Max(0f,
-                speedBoostAmount - Time.deltaTime / Mathf.Max(0.1f, speedBoostDuration));
-            lastSpeedBoostUseTime = Time.time;
-            speedBoostWasUsed = true;
+            if (!IsStaminaFrozen)
+            {
+                speedBoostAmount = Mathf.Max(0f,
+                    speedBoostAmount - Time.deltaTime / Mathf.Max(0.1f, speedBoostDuration));
+                lastSpeedBoostUseTime = Time.time;
+                speedBoostWasUsed = true;
+            }
 
             if (speedBoostAmount <= 0f)
                 IsSpeedBoosting = false;
@@ -332,12 +338,28 @@ public class SubjiPlayerMovement : MonoBehaviour
             return;
 
         speedBoostGaugeRoot.localPosition = speedBoostGaugeOffset;
-        speedBoostGaugeRoot.gameObject.SetActive(speedBoostWasUsed || speedBoostAmount < 1f);
+        speedBoostGaugeRoot.gameObject.SetActive(
+            IsStaminaFrozen || speedBoostWasUsed || speedBoostAmount < 1f);
+
+        SpriteRenderer fillRenderer = speedBoostGaugeFill.GetComponent<SpriteRenderer>();
+        if (fillRenderer != null)
+            fillRenderer.color = IsStaminaFrozen ? staminaFreezeGaugeColor : speedBoostGaugeColor;
 
         float width = speedBoostGaugeSize.x * Mathf.Clamp01(speedBoostAmount);
         speedBoostGaugeFill.localScale = new Vector3(width, speedBoostGaugeSize.y, 1f);
         speedBoostGaugeFill.localPosition = new Vector3(
             (width - speedBoostGaugeSize.x) * 0.5f, 0f, -0.01f);
+    }
+
+    public void PreventStaminaDrain(float duration, Color gaugeColor)
+    {
+        speedBoostAmount = 1f;
+        speedBoostWasUsed = false;
+        lastSpeedBoostUseTime = float.NegativeInfinity;
+        staminaFreezeEndTime = Mathf.Max(staminaFreezeEndTime,
+            Time.time + Mathf.Max(0f, duration));
+        staminaFreezeGaugeColor = gaugeColor;
+        UpdateSpeedBoostGauge();
     }
 
     void LateUpdate()

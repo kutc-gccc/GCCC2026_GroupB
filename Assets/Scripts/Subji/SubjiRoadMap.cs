@@ -52,6 +52,7 @@ public class SubjiRoadMap : MonoBehaviour
     private Camera minimapCamera;
     private RenderTexture minimapTexture;
     private GameObject stageMapRoot;
+    private SubjiMovementArea2D movementArea;
 
     public Vector2 Center => center;
 
@@ -62,6 +63,7 @@ public class SubjiRoadMap : MonoBehaviour
     private void Awake()
     {
         center = transform.position;
+        movementArea = FindFirstObjectByType<SubjiMovementArea2D>();
         BuildRoads();
         IsReady = true;
     }
@@ -220,9 +222,8 @@ public class SubjiRoadMap : MonoBehaviour
 
     public Vector2 ConstrainToRoad(Vector2 currentPosition, Vector2 desiredPosition, Vector2 playerExtents)
     {
-        // 新ステージでは60x60の旧フィールド境界を含め、移動制限を一切かけない。
         if (!restrictMovementToRoads)
-            return desiredPosition;
+            return ConstrainToMovementArea(currentPosition, desiredPosition, playerExtents);
 
         float halfField = fieldSize * 0.5f;
         desiredPosition.x = Mathf.Clamp(desiredPosition.x,
@@ -232,19 +233,64 @@ public class SubjiRoadMap : MonoBehaviour
             center.y - halfField + playerExtents.y,
             center.y + halfField - playerExtents.y);
 
-        if (IsOnRoad(desiredPosition, playerExtents))
+        if (IsOnRoad(desiredPosition, playerExtents) &&
+            !OverlapsInvisibleWall(desiredPosition, playerExtents))
             return desiredPosition;
 
         // Sliding along an edge feels better than stopping both axes at once.
         Vector2 horizontalOnly = new Vector2(desiredPosition.x, currentPosition.y);
-        if (IsOnRoad(horizontalOnly, playerExtents))
+        if (IsOnRoad(horizontalOnly, playerExtents) &&
+            !OverlapsInvisibleWall(horizontalOnly, playerExtents))
             return horizontalOnly;
 
         Vector2 verticalOnly = new Vector2(currentPosition.x, desiredPosition.y);
-        if (IsOnRoad(verticalOnly, playerExtents))
+        if (IsOnRoad(verticalOnly, playerExtents) &&
+            !OverlapsInvisibleWall(verticalOnly, playerExtents))
             return verticalOnly;
 
         return currentPosition;
+    }
+
+    private Vector2 ConstrainToMovementArea(Vector2 currentPosition, Vector2 position, Vector2 extents)
+    {
+        if (movementArea == null)
+            movementArea = FindFirstObjectByType<SubjiMovementArea2D>();
+        if (movementArea == null || !movementArea.IsConfirmed)
+            return position;
+
+        Bounds bounds = movementArea.GetWorldBounds();
+        position.x = Mathf.Clamp(position.x, bounds.min.x + extents.x, bounds.max.x - extents.x);
+        position.y = Mathf.Clamp(position.y, bounds.min.y + extents.y, bounds.max.y - extents.y);
+        if (!OverlapsInvisibleWall(position, extents))
+            return position;
+
+        Vector2 horizontalOnly = new(position.x, currentPosition.y);
+        if (!OverlapsInvisibleWall(horizontalOnly, extents))
+            return horizontalOnly;
+        Vector2 verticalOnly = new(currentPosition.x, position.y);
+        return !OverlapsInvisibleWall(verticalOnly, extents) ? verticalOnly : currentPosition;
+    }
+
+    private static bool OverlapsInvisibleWall(Vector2 position, Vector2 extents)
+    {
+        float minX = position.x - extents.x;
+        float maxX = position.x + extents.x;
+        float minY = position.y - extents.y;
+        float maxY = position.y + extents.y;
+
+        foreach (InvisibleWall2D wall in InvisibleWall2D.ActiveWalls)
+        {
+            if (wall == null || !wall.isActiveAndEnabled)
+                continue;
+            BoxCollider2D box = wall.Collider;
+            if (box == null || !box.enabled)
+                continue;
+            Bounds wallBounds = box.bounds;
+            if (maxX > wallBounds.min.x && minX < wallBounds.max.x &&
+                maxY > wallBounds.min.y && minY < wallBounds.max.y)
+                return true;
+        }
+        return false;
     }
 
     public Vector2 GetClosestPointOnRoad(Vector2 position, Vector2 extents)

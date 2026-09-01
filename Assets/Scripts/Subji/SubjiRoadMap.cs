@@ -53,6 +53,9 @@ public class SubjiRoadMap : MonoBehaviour
     private RenderTexture minimapTexture;
     private GameObject stageMapRoot;
     private SubjiMovementArea2D movementArea;
+    private const int MinimapStageLayer = 8;
+    private float nextMinimapRenderTime;
+    private const float MinimapRenderInterval = 0.25f;
 
     public Vector2 Center => center;
 
@@ -107,6 +110,12 @@ public class SubjiRoadMap : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
+
+        if (minimapCamera != null && Time.unscaledTime >= nextMinimapRenderTime)
+        {
+            nextMinimapRenderTime = Time.unscaledTime + MinimapRenderInterval;
+            minimapCamera.Render();
+        }
 
         if (!enableDebugToggleKey || Keyboard.current == null)
             return;
@@ -174,20 +183,35 @@ public class SubjiRoadMap : MonoBehaviour
         if (minimapCamera != null && minimapTexture != null)
             return;
 
+        // ミニマップ用カメラには地形と建物だけを映す。
+        gameObject.layer = MinimapStageLayer;
+        if (stageMapRoot != null)
+            SetLayerRecursively(stageMapRoot, MinimapStageLayer);
+
         GameObject cameraObject = new GameObject("Runtime Stage Minimap Camera");
         cameraObject.transform.SetParent(transform, false);
         minimapCamera = cameraObject.AddComponent<Camera>();
         minimapCamera.orthographic = true;
         minimapCamera.clearFlags = CameraClearFlags.SolidColor;
         minimapCamera.backgroundColor = new Color(0.04f, 0.06f, 0.08f, 1f);
-        minimapCamera.cullingMask = ~0;
+        minimapCamera.cullingMask = 1 << MinimapStageLayer;
         minimapCamera.depth = -100f;
+        minimapCamera.enabled = false;
 
-        minimapTexture = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32);
+        minimapTexture = new RenderTexture(256, 256, 16, RenderTextureFormat.ARGB32);
         minimapTexture.name = "Runtime Stage Minimap";
         minimapTexture.filterMode = FilterMode.Bilinear;
         minimapCamera.targetTexture = minimapTexture;
         UpdateMinimapCamera();
+        minimapCamera.Render();
+        nextMinimapRenderTime = Time.unscaledTime + MinimapRenderInterval;
+    }
+
+    private static void SetLayerRecursively(GameObject target, int layer)
+    {
+        target.layer = layer;
+        foreach (Transform child in target.transform)
+            SetLayerRecursively(child.gameObject, layer);
     }
 
     private void UpdateMinimapCamera()
@@ -660,34 +684,7 @@ public class SubjiRoadMap : MonoBehaviour
         Vector2 local = (Vector2)player.position - center;
         float markerX = (local.x + fieldSize * 0.5f) * scale;
         float markerY = mapSize - ((local.y + fieldSize * 0.5f) * scale);
-        if (hasTaskDestination)
-        {
-            Vector2 destinationLocal = taskDestination - center;
-            float destinationX = (destinationLocal.x + fieldSize * 0.5f) * scale;
-            float destinationY = mapSize - ((destinationLocal.y + fieldSize * 0.5f) * scale);
-            GUI.color = minimapDestinationColor;
-            GUI.DrawTexture(new Rect(destinationX - 5f, destinationY - 5f, 10f, 10f),
-                Texture2D.whiteTexture);
-        }
-
-        GUI.color = minimapEnemyColor;
-        foreach (SubjiEnemyChase enemy in SubjiEnemyChase.ActiveEnemies)
-        {
-            Vector2 enemyLocal = (Vector2)enemy.transform.position - center;
-            float enemyX = (enemyLocal.x + fieldSize * 0.5f) * scale;
-            float enemyY = mapSize - ((enemyLocal.y + fieldSize * 0.5f) * scale);
-            if (showDetectionRangesOnMinimap)
-            {
-                GUI.color = minimapDetectionRangeColor;
-                DrawMinimapCircle(new Vector2(enemyX, enemyY),
-                    enemy.CurrentDetectionRadius * scale);
-            }
-
-            GUI.color = minimapEnemyColor;
-            GUI.DrawTexture(new Rect(enemyX - 4f, enemyY - 4f, 8f, 8f), Texture2D.whiteTexture);
-        }
-
-        // 最後に描画して、背景や敵の索敵円にプレイヤーが隠れないようにする。
+        // ミニマップ上にはプレイヤーの現在地だけを重ねて表示する。
         markerX = Mathf.Clamp(markerX, 7f, mapSize - 7f);
         markerY = Mathf.Clamp(markerY, 7f, mapSize - 7f);
         GUI.color = Color.white;

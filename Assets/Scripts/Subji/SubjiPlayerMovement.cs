@@ -41,11 +41,11 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Tooltip("夜の暗さをON/OFFするキー")]
     public Key nightVisionToggleKey = Key.P;
 
-    [Tooltip("この半径までは暗くなりません。敵の移動中索敵半径5より少し小さい4.5が初期値です")]
-    [Min(0.1f)] public float playerVisionRadius = 4.5f;
+    [Tooltip("ライト消灯中の最小視野半径")]
+    [Min(0.1f)] public float playerVisionRadius = 1f;
 
-    [Tooltip("視野の端が暗くなっていくグラデーションの幅")]
-    [Min(0.1f)] public float visionGradientWidth = 3f;
+    [Tooltip("視野境界のぼかし幅")]
+    [Min(0.1f)] public float visionGradientWidth = 1.3f;
 
     [Tooltip("視野外の暗さ。1で完全な黒、0で透明です")]
     [Range(0f, 1f)] public float outsideDarkness = 0.95f;
@@ -58,6 +58,14 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     [Tooltip("グラデーション画像の解像度。高いほど滑らかですが生成負荷が増えます")]
     [Range(64, 512)] public int darknessTextureResolution = 256;
+
+    [Header("スロット2のライト")]
+    [Tooltip("左から数えたライトのスロット番号")]
+    [Min(1)] public int lightSlotNumber = 2;
+    [Tooltip("敵の正面視野と同じ、ライトの照射角度")]
+    [Range(1f, 180f)] public float lightViewAngle = 30f;
+    [Tooltip("敵の正面視野と同じ、ライトの照射距離")]
+    [Min(0.1f)] public float lightViewDistance = 5.5f;
 
     [Header("敵の初期設定")]
     [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
@@ -90,6 +98,20 @@ public class SubjiPlayerMovement : MonoBehaviour
     private static Sprite gaugeSprite;
     private GameObject darknessOverlay;
     private Texture2D darknessTexture;
+    private Texture2D lightDarknessTexture;
+    private Sprite darknessSprite;
+    private Sprite lightDarknessSprite;
+    private SpriteRenderer darknessRenderer;
+    private ItemSlotSelector itemSlotSelector;
+    private bool isLightOn;
+    private float nextPlacedLightRefreshTime;
+    private Color[] darknessPixelBuffer;
+    private readonly System.Collections.Generic.List<Vector3> placedLightData = new();
+    private int lastPlacedLightCount = -1;
+    private Material darknessMaterial;
+    private readonly Vector4[] placedLightShaderData = new Vector4[30];
+    private Vector2 flashlightDirection = Vector2.right;
+    private int lastPlacedLightRevision = -1;
     private float staminaFreezeEndTime;
     private Color staminaFreezeGaugeColor;
 
@@ -167,6 +189,8 @@ public class SubjiPlayerMovement : MonoBehaviour
             enableNightVision = !enableNightVision;
             UpdateDarknessVisibility();
         }
+        UpdateSlotLight();
+        UpdateDarknessMaterial();
         UpdateSpeedBoost();
         UpdateSubscriberGrowth();
     }
@@ -199,20 +223,100 @@ public class SubjiPlayerMovement : MonoBehaviour
     void CreateDarknessOverlay()
     {
         darknessOverlay = new GameObject("Player Vision Darkness");
-        darknessOverlay.transform.SetParent(transform, false);
-        darknessOverlay.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+        // ミニマップカメラから除外できるよう、Ignore Raycastレイヤーを使用する。
+        darknessOverlay.layer = 2;
+        darknessOverlay.transform.position = new Vector3(fieldCenter.x, fieldCenter.y, -0.1f);
+        float overlaySize = Mathf.Max(darknessOverlaySize,
+            roadMap != null ? roadMap.fieldSize + 20f : 100f);
 
-        int resolution = Mathf.Clamp(darknessTextureResolution, 64, 512);
-        float overlaySize = Mathf.Max(10f, darknessOverlaySize);
-        float clearRadius = Mathf.Max(0.1f, playerVisionRadius);
-        float gradientWidth = Mathf.Max(0.1f, visionGradientWidth);
+        darknessTexture = new Texture2D(1, 1);
+        darknessTexture.SetPixel(0, 0, Color.white);
+        darknessTexture.Apply();
+        darknessSprite = Sprite.Create(darknessTexture, new Rect(0f, 0f, 1f, 1f),
+            new Vector2(0.5f, 0.5f), 1f);
+        darknessOverlay.transform.localScale = new Vector3(overlaySize, overlaySize, 1f);
 
-        darknessTexture = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
-        darknessTexture.name = "Runtime Player Vision Gradient";
-        darknessTexture.filterMode = FilterMode.Bilinear;
-        darknessTexture.wrapMode = TextureWrapMode.Clamp;
+        darknessRenderer = darknessOverlay.AddComponent<SpriteRenderer>();
+        darknessRenderer.sprite = darknessSprite;
+        // 建物や敵を含むワールド描画の手前に置き、視界外を確実に隠す。
+        darknessRenderer.sortingLayerName = "New Layer 2";
+        darknessRenderer.sortingOrder = 1000;
+        Shader darknessShader = Shader.Find("Subji/Static Darkness Reveal");
+        if (darknessShader != null)
+        {
+            darknessMaterial = new Material(darknessShader);
+            darknessRenderer.material = darknessMaterial;
+        }
+        UpdateDarknessVisibility();
+        UpdateDarknessMaterial();
+    }
 
-        Color[] pixels = new Color[resolution * resolution];
+    void UpdateDarknessMaterial()
+    {
+        if (darknessMaterial == null)
+            return;
+
+        Color appliedDarknessColor = darknessColor;
+        appliedDarknessColor.a *= outsideDarkness;
+        darknessMaterial.SetColor("_Color", appliedDarknessColor);
+        darknessMaterial.SetVector("_PlayerData", new Vector4(transform.position.x,
+            transform.position.y, playerVisionRadius, visionGradientWidth));
+        darknessMaterial.SetVector("_FlashlightData", new Vector4(isLightOn ? 1f : 0f,
+            lightViewDistance, Mathf.Cos(lightViewAngle * 0.5f * Mathf.Deg2Rad), 0f));
+        darknessMaterial.SetVector("_FlashlightDirection",
+            new Vector4(flashlightDirection.x, flashlightDirection.y, 0f, 0f));
+
+        if (lastPlacedLightRevision == SubjiPlacedLight.Revision)
+            return;
+
+        lastPlacedLightRevision = SubjiPlacedLight.Revision;
+        int count = 0;
+        foreach (SubjiPlacedLight placedLight in SubjiPlacedLight.ActiveLights)
+        {
+            if (placedLight == null || count >= placedLightShaderData.Length)
+                continue;
+            Vector3 position = placedLight.transform.position;
+            placedLightShaderData[count++] = new Vector4(position.x, position.y,
+                placedLight.radius, placedLight.blurWidth);
+        }
+        darknessMaterial.SetInt("_PlacedLightCount", count);
+        darknessMaterial.SetVectorArray("_PlacedLights", placedLightShaderData);
+    }
+
+    Texture2D CreateDarknessTexture(int resolution, float overlaySize, float clearRadius,
+        float gradientWidth, bool includeLightCone)
+    {
+        Texture2D texture = new Texture2D(
+            resolution, resolution, TextureFormat.RGBA32, false);
+        texture.name = includeLightCone
+            ? "Runtime Player Light Vision Gradient"
+            : "Runtime Player Vision Gradient";
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        FillDarknessTexture(texture, resolution, overlaySize, clearRadius,
+            gradientWidth, includeLightCone);
+        return texture;
+    }
+
+    void FillDarknessTexture(Texture2D texture, int resolution, float overlaySize,
+        float clearRadius, float gradientWidth, bool includeLightCone)
+    {
+        if (darknessPixelBuffer == null || darknessPixelBuffer.Length != resolution * resolution)
+            darknessPixelBuffer = new Color[resolution * resolution];
+
+        placedLightData.Clear();
+        foreach (SubjiPlacedLight placedLight in SubjiPlacedLight.ActiveLights)
+        {
+            if (placedLight == null)
+                continue;
+            Vector2 localPosition = darknessOverlay.transform.InverseTransformPoint(
+                placedLight.transform.position);
+            placedLightData.Add(new Vector3(localPosition.x, localPosition.y,
+                Mathf.Max(0.1f, placedLight.radius)));
+            placedLightData.Add(new Vector3(placedLight.blurWidth, 0f, 0f));
+        }
+
         for (int y = 0; y < resolution; y++)
         {
             for (int x = 0; x < resolution; x++)
@@ -222,7 +326,31 @@ public class SubjiPlayerMovement : MonoBehaviour
                 float distance = Mathf.Sqrt(worldX * worldX + worldY * worldY);
                 float gradient = Mathf.SmoothStep(0f, 1f,
                     Mathf.InverseLerp(clearRadius, clearRadius + gradientWidth, distance));
-                pixels[y * resolution + x] = new Color(
+
+                if (includeLightCone && distance <= lightViewDistance)
+                {
+                    float angle = Mathf.Abs(Mathf.Atan2(worldY, worldX) * Mathf.Rad2Deg);
+                    if (angle <= lightViewAngle * 0.5f)
+                        gradient = 0f;
+                }
+
+                for (int lightIndex = 0; lightIndex < placedLightData.Count; lightIndex += 2)
+                {
+                    Vector3 light = placedLightData[lightIndex];
+                    float blur = Mathf.Max(0.01f, placedLightData[lightIndex + 1].x);
+                    float deltaX = worldX - light.x;
+                    float deltaY = worldY - light.y;
+                    float outerRadius = light.z + blur;
+                    float squaredDistance = deltaX * deltaX + deltaY * deltaY;
+                    if (squaredDistance >= outerRadius * outerRadius)
+                        continue;
+                    float lightDistance = Mathf.Sqrt(squaredDistance);
+                    float lightGradient = Mathf.SmoothStep(0f, 1f,
+                        Mathf.InverseLerp(light.z, outerRadius, lightDistance));
+                    gradient = Mathf.Min(gradient, lightGradient);
+                }
+
+                darknessPixelBuffer[y * resolution + x] = new Color(
                     darknessColor.r,
                     darknessColor.g,
                     darknessColor.b,
@@ -230,20 +358,63 @@ public class SubjiPlayerMovement : MonoBehaviour
             }
         }
 
-        darknessTexture.SetPixels(pixels);
-        darknessTexture.Apply(false, false);
+        texture.SetPixels(darknessPixelBuffer);
+        texture.Apply(false, false);
+    }
 
-        Sprite darknessSprite = Sprite.Create(
-            darknessTexture,
+    void RefreshVisibleDarknessTexture()
+    {
+        if (darknessTexture == null || lightDarknessTexture == null || darknessOverlay == null)
+            return;
+
+        int resolution = darknessTexture.width;
+        float overlaySize = Mathf.Max(10f, darknessOverlaySize);
+        float clearRadius = Mathf.Max(0.1f, playerVisionRadius);
+        float gradientWidth = Mathf.Max(0.1f, visionGradientWidth);
+        FillDarknessTexture(isLightOn ? lightDarknessTexture : darknessTexture,
+            resolution, overlaySize, clearRadius, gradientWidth, isLightOn);
+    }
+
+    static Sprite CreateDarknessSprite(Texture2D texture, int resolution, float overlaySize,
+        string spriteName)
+    {
+        Sprite sprite = Sprite.Create(
+            texture,
             new Rect(0f, 0f, resolution, resolution),
             new Vector2(0.5f, 0.5f),
             resolution / overlaySize);
-        darknessSprite.name = "Runtime Player Vision Sprite";
+        sprite.name = spriteName;
+        return sprite;
+    }
 
-        SpriteRenderer darknessRenderer = darknessOverlay.AddComponent<SpriteRenderer>();
-        darknessRenderer.sprite = darknessSprite;
-        darknessRenderer.sortingOrder = 20;
-        UpdateDarknessVisibility();
+    void UpdateSlotLight()
+    {
+        if (Mouse.current == null)
+            return;
+
+        if (itemSlotSelector == null)
+            itemSlotSelector = FindFirstObjectByType<ItemSlotSelector>();
+
+        bool lightSlotSelected = itemSlotSelector != null &&
+            itemSlotSelector.SelectedIndex == Mathf.Max(1, lightSlotNumber) - 1;
+        if (lightSlotSelected && Mouse.current.leftButton.wasPressedThisFrame)
+            SetLightOn(true);
+        if (lightSlotSelected && Mouse.current.rightButton.wasPressedThisFrame)
+            SetLightOn(false);
+
+        if (!isLightOn || darknessOverlay == null || Camera.main == null)
+            return;
+
+        Vector2 mouseWorld = Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
+        Vector2 direction = mouseWorld - (Vector2)transform.position;
+        if (direction.sqrMagnitude > 0.0001f)
+            flashlightDirection = direction.normalized;
+    }
+
+    void SetLightOn(bool turnOn)
+    {
+        isLightOn = turnOn;
+        UpdateDarknessMaterial();
     }
 
     void UpdateDarknessVisibility()
@@ -254,8 +425,16 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void OnDestroy()
     {
+        if (darknessSprite != null)
+            Destroy(darknessSprite);
+        if (lightDarknessSprite != null)
+            Destroy(lightDarknessSprite);
         if (darknessTexture != null)
             Destroy(darknessTexture);
+        if (lightDarknessTexture != null)
+            Destroy(lightDarknessTexture);
+        if (darknessMaterial != null)
+            Destroy(darknessMaterial);
     }
 
     void UpdateSpeedBoost()

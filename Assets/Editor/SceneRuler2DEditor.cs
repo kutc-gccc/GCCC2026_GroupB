@@ -49,6 +49,18 @@ public sealed class SceneRuler2DEditor : Editor
         for (int i = 0; i < worldPoints.Count - 1; i++)
             Handles.DrawDottedLine(worldPoints[i], worldPoints[i + 1], 4f);
 
+        GUIStyle coordinateStyle = new(EditorStyles.boldLabel);
+        coordinateStyle.normal.textColor = Color.cyan;
+        for (int i = 0; i < worldPoints.Count; i++)
+        {
+            Vector3 point = worldPoints[i];
+            float offset = HandleUtility.GetHandleSize(point) * 0.12f;
+            Handles.Label(
+                point + new Vector3(offset, offset, 0f),
+                $"({point.x:0.##}, {point.y:0.##})",
+                coordinateStyle);
+        }
+
         Event current = Event.current;
         if (current.type == EventType.KeyDown && current.keyCode == KeyCode.R)
         {
@@ -114,9 +126,23 @@ public sealed class SceneRuler2DEditor : Editor
         Vector3 center = (a + b) * 0.5f;
         EditorGUILayout.LabelField("中央 X", center.x.ToString("0.##"));
         EditorGUILayout.LabelField("中央 Y", center.y.ToString("0.##"));
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("ワールド座標", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("端点 A", FormatCoordinates(a));
+        for (int i = 0; i < ruler.additionalPoints.Count; i++)
+        {
+            Vector3 point = ruler.transform.TransformPoint(ruler.additionalPoints[i]);
+            EditorGUILayout.LabelField($"追加頂点 {i + 1}", FormatCoordinates(point));
+        }
+        EditorGUILayout.LabelField("端点 B", FormatCoordinates(b));
         EditorGUILayout.LabelField("追加頂点", ruler.additionalPoints.Count.ToString());
         EditorGUILayout.LabelField("端点の連結", ruler.isLoopConnected ? "連結済み" : "未連結");
         EditorGUILayout.HelpBox("Scene Ruler選択中のみ有効\nOキー：左端側に頂点を追加\n左右の端点が重なると紫色\n重なった状態でShift+O：端点を連結\nRキー：追加頂点と連結をリセット\nEnter：透明壁を生成", MessageType.Info);
+    }
+
+    private static string FormatCoordinates(Vector3 point)
+    {
+        return $"X: {point.x:0.##}, Y: {point.y:0.##}";
     }
 
     private static List<Vector3> GetWorldPoints(SceneRuler2D ruler)

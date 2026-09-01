@@ -10,6 +10,10 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class JikkenCommentStream : MonoBehaviour
 {
+    [Header("自動生成")]
+    [Tooltip("オンにすると、プレイ中にタスク付きコメントと通常コメントを自動生成します")]
+    public bool autoGenerateComments;
+
     [Serializable]
     public class TaskComment
     {
@@ -155,11 +159,14 @@ public class JikkenCommentStream : MonoBehaviour
                 popupRoot.SetActive(false);
         }
 
-        timer += Time.deltaTime;
-        if (timer >= spawnInterval)
+        if (autoGenerateComments)
         {
-            timer = 0f;
-            SpawnComment();
+            timer += Time.deltaTime;
+            if (timer >= spawnInterval)
+            {
+                timer = 0f;
+                SpawnComment();
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -18,7 +19,6 @@ public class SubjiGameClearGoal : MonoBehaviour
     private SpriteRenderer goalRenderer;
     private Sprite markerSprite;
     private Texture2D markerTexture;
-    private SpriteRenderer playerRenderer;
     private GUIStyle clearStyle;
     private GUIStyle restartStyle;
     private bool isClear;
@@ -26,24 +26,13 @@ public class SubjiGameClearGoal : MonoBehaviour
 
     public bool IsClear => isClear;
     public bool IsGameOver => isGameOver;
+    public Transform GoalTransform => goalMarker != null ? goalMarker.transform : null;
+    public event Action GoalReached;
 
     private void Awake()
     {
-        playerRenderer = GetComponent<SpriteRenderer>();
         CreateGoalMarker();
-    }
-
-    private void Update()
-    {
-        if (isClear || isGameOver || goalRenderer == null)
-            return;
-
-        bool isTouching = playerRenderer != null
-            ? playerRenderer.bounds.Intersects(goalRenderer.bounds)
-            : Vector2.Distance(transform.position, goalPosition) <= goalSize * 0.5f;
-
-        if (isTouching)
-            ClearGame();
+        SetGoalActive(false);
     }
 
     private void CreateGoalMarker()
@@ -66,12 +55,30 @@ public class SubjiGameClearGoal : MonoBehaviour
         goalRenderer.sprite = markerSprite;
         goalRenderer.color = goalColor;
         goalRenderer.sortingOrder = 8;
+
+        BoxCollider2D triggerCollider = goalMarker.AddComponent<BoxCollider2D>();
+        triggerCollider.isTrigger = true;
     }
 
-    private void ClearGame()
+    private void OnTriggerEnter2D(Collider2D other)
     {
-        isClear = true;
+        if (goalMarker != null && other.gameObject == goalMarker)
+            ReachGoal();
+    }
 
+    public void SetGoalActive(bool active)
+    {
+        if (goalMarker != null && !isClear && !isGameOver)
+            goalMarker.SetActive(active);
+    }
+
+    public void ReachGoal()
+    {
+        if (isClear || isGameOver || goalMarker == null || !goalMarker.activeSelf)
+            return;
+
+        isClear = true;
+        GoalReached?.Invoke();
         StopGame();
     }
 

@@ -17,7 +17,8 @@ public class JikkenCommentStream : MonoBehaviour
         VendingPurchase,
         BushHide,
         CoffeeCupLight,
-        CastleLight
+        CastleLight,
+        EscapeGoal
     }
 
     [Header("自動生成")]
@@ -55,6 +56,29 @@ public class JikkenCommentStream : MonoBehaviour
         }
     };
     [Range(0f, 100f)] public float taskCommentChance = 25f;
+
+    [Header("BGM")]
+    [Tooltip("ステージ中にループ再生するBGM。未設定時は共通BGMを使用します")]
+    public AudioClip backgroundMusic;
+    [Range(0f, 1f)] public float backgroundMusicVolume = 0.7f;
+    [Tooltip("敵に追跡されている間にループ再生するBGM。未設定時は共通追跡BGMを使用します")]
+    public AudioClip enemyChaseMusic;
+    [Range(0f, 1f)] public float enemyChaseMusicVolume = 0.7f;
+
+    [Header("コメント発生音")]
+    [Tooltip("コメント欄へ新しいコメントが追加された瞬間に再生します")]
+    public AudioClip commentAppearedSound;
+    [Range(0f, 1f)] public float commentAppearedSoundVolume = 1f;
+
+    [Header("タスク選択音")]
+    [Tooltip("タスクを選択して受諾した瞬間に再生します")]
+    public AudioClip taskSelectedSound;
+    [Range(0f, 1f)] public float taskSelectedSoundVolume = 1f;
+
+    [Header("タスク完了音")]
+    [Tooltip("選択中のタスクを完了した瞬間に再生します")]
+    public AudioClip taskCompletedSound;
+    [Range(0f, 1f)] public float taskCompletedSoundVolume = 1f;
 
     [Header("タスク目的地")]
     [Tooltip("目的地へこの距離まで近づくとタスク完了になります")]
@@ -127,6 +151,7 @@ public class JikkenCommentStream : MonoBehaviour
     private DrinkItemController drinkItemController;
     private CoffeeCupLightInteraction coffeeCupInteraction;
     private CoffeeCupLightInteraction castleInteraction;
+    private SubjiGameClearGoal gameClearGoal;
     private bool postTutorialTasksStarted;
     private int postTutorialSequenceStep;
     private float postTutorialSequenceTimer;
@@ -137,6 +162,10 @@ public class JikkenCommentStream : MonoBehaviour
     private bool greenGuardSpawned;
     private bool coffeeCupTaskCreated;
     private bool castleTaskCreated;
+    private AudioSource backgroundMusicSource;
+    private AudioSource commentAppearedAudioSource;
+    private AudioSource taskSelectedAudioSource;
+    private AudioSource taskCompletedAudioSource;
 
     [Header("ID6・7完了後の監視敵")]
     [Tooltip("配下にシーン配置した監視敵を置きます。複製した敵も両タスク完了時にまとめて有効化します")]
@@ -154,12 +183,118 @@ public class JikkenCommentStream : MonoBehaviour
         EnsureUiExists(false);
         if (Application.isPlaying)
         {
+            StartBackgroundMusic();
+            ConfigureCommentAppearedSound();
+            ConfigureTaskSelectedSound();
+            ConfigureTaskCompletedSound();
             uiRoot.SetActive(false);
             CreatePopupUi();
             SubscribeToWorldTasks();
             if (playIntroTutorial)
                 BeginIntroTutorial();
         }
+    }
+
+    private void StartBackgroundMusic()
+    {
+        if (backgroundMusic == null)
+            backgroundMusic = Resources.Load<AudioClip>("Audio/pumpkin_house_bgm");
+        if (backgroundMusic == null)
+            return;
+
+        backgroundMusicSource = gameObject.AddComponent<AudioSource>();
+        backgroundMusicSource.clip = backgroundMusic;
+        backgroundMusicSource.volume = backgroundMusicVolume;
+        backgroundMusicSource.loop = true;
+        backgroundMusicSource.playOnAwake = false;
+        backgroundMusicSource.spatialBlend = 0f;
+        backgroundMusicSource.Play();
+        SubjiEnemyChase.AnyEnemyChasingChanged += SwitchChaseMusic;
+    }
+
+    private void ConfigureCommentAppearedSound()
+    {
+        if (commentAppearedSound == null)
+            commentAppearedSound = Resources.Load<AudioClip>("Audio/comment_appeared");
+        if (commentAppearedSound == null)
+            return;
+
+        commentAppearedAudioSource = gameObject.AddComponent<AudioSource>();
+        commentAppearedAudioSource.playOnAwake = false;
+        commentAppearedAudioSource.loop = false;
+        commentAppearedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayCommentAppearedSound()
+    {
+        if (commentAppearedAudioSource != null && commentAppearedSound != null)
+        {
+            commentAppearedAudioSource.PlayOneShot(
+                commentAppearedSound, commentAppearedSoundVolume);
+        }
+    }
+
+    private void ConfigureTaskSelectedSound()
+    {
+        if (taskSelectedSound == null)
+            taskSelectedSound = Resources.Load<AudioClip>("Audio/task_selected");
+        if (taskSelectedSound == null)
+            return;
+
+        taskSelectedAudioSource = gameObject.AddComponent<AudioSource>();
+        taskSelectedAudioSource.playOnAwake = false;
+        taskSelectedAudioSource.loop = false;
+        taskSelectedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayTaskSelectedSound()
+    {
+        if (taskSelectedAudioSource != null && taskSelectedSound != null)
+        {
+            taskSelectedAudioSource.PlayOneShot(
+                taskSelectedSound, taskSelectedSoundVolume);
+        }
+    }
+
+    private void ConfigureTaskCompletedSound()
+    {
+        if (taskCompletedSound == null)
+            taskCompletedSound = Resources.Load<AudioClip>("Audio/task_completed");
+        if (taskCompletedSound == null)
+            return;
+
+        taskCompletedAudioSource = gameObject.AddComponent<AudioSource>();
+        taskCompletedAudioSource.playOnAwake = false;
+        taskCompletedAudioSource.loop = false;
+        taskCompletedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayTaskCompletedSound()
+    {
+        if (taskCompletedAudioSource != null && taskCompletedSound != null)
+        {
+            taskCompletedAudioSource.PlayOneShot(
+                taskCompletedSound, taskCompletedSoundVolume);
+        }
+    }
+
+    private void SwitchChaseMusic(bool isBeingChased)
+    {
+        if (backgroundMusicSource == null)
+            return;
+
+        if (enemyChaseMusic == null)
+            enemyChaseMusic = Resources.Load<AudioClip>("Audio/enemy_chase_bgm");
+        AudioClip nextClip = isBeingChased ? enemyChaseMusic : backgroundMusic;
+        if (nextClip == null || backgroundMusicSource.clip == nextClip)
+            return;
+
+        backgroundMusicSource.Stop();
+        backgroundMusicSource.clip = nextClip;
+        backgroundMusicSource.volume = isBeingChased
+            ? enemyChaseMusicVolume
+            : backgroundMusicVolume;
+        backgroundMusicSource.Play();
     }
 
     private void OnEnable()
@@ -556,6 +691,7 @@ public class JikkenCommentStream : MonoBehaviour
             isTask ? taskTextColor : popupTextColor);
 
         comments.Insert(0, rect);
+        PlayCommentAppearedSound();
         ArrangeComments();
         while (comments.Count > maximumComments)
             RemoveCommentAt(comments.Count - 1);
@@ -595,6 +731,7 @@ public class JikkenCommentStream : MonoBehaviour
                     "マウススクロールしてコメント左クリックでタスクを確認しよう",
                     normalTextColor);
                 tutorialStep3CommentCreated = true;
+                tutorialTimer = tutorialMessageInterval;
             }
 
             if (isOpen)
@@ -607,6 +744,7 @@ public class JikkenCommentStream : MonoBehaviour
             {
                 ShowPopup("マウススクロールしてコメント左クリックでタスクを確認しよう",
                     popupTextColor);
+                PlayCommentAppearedSound();
                 tutorialTimer = tutorialMessageInterval;
             }
             return;
@@ -614,7 +752,10 @@ public class JikkenCommentStream : MonoBehaviour
 
         if (tutorialStep == 4 && tutorialTimer <= 0f)
         {
+            bool isLoopPlayback = tutorialTaskCommentCreated;
             ShowPopup("コメントの赤文字をクリックしてみて右クリで閉じれるよ", popupTextColor);
+            if (isLoopPlayback)
+                PlayCommentAppearedSound();
             tutorialTimer = tutorialMessageInterval;
             if (!tutorialTaskCommentCreated)
             {
@@ -625,6 +766,7 @@ public class JikkenCommentStream : MonoBehaviour
                 ConfigureListItem(instructionRect);
                 instruction.GetComponent<TextMeshProUGUI>().raycastTarget = false;
                 comments.Insert(0, instructionRect);
+                PlayCommentAppearedSound();
                 tutorialTaskCommentCreated = true;
                 ArrangeComments();
             }
@@ -650,6 +792,7 @@ public class JikkenCommentStream : MonoBehaviour
         button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
         button.onClick.AddListener(() => onSelected(rect));
         comments.Insert(0, rect);
+        PlayCommentAppearedSound();
         ArrangeComments();
         ShowPopup(message, taskTextColor);
     }
@@ -665,6 +808,7 @@ public class JikkenCommentStream : MonoBehaviour
         ConfigureListItem(rect);
         comment.GetComponent<TextMeshProUGUI>().raycastTarget = false;
         comments.Insert(0, rect);
+        PlayCommentAppearedSound();
         ArrangeComments();
     }
 
@@ -715,6 +859,7 @@ public class JikkenCommentStream : MonoBehaviour
         if (task == null)
             return;
 
+        PlayTaskSelectedSound();
         selectedTask = task;
 
         if (roadMap != null && task.completionType == TaskCompletionType.Destination)
@@ -795,6 +940,7 @@ public class JikkenCommentStream : MonoBehaviour
 
     private void OnDestroy()
     {
+        SubjiEnemyChase.AnyEnemyChasingChanged -= SwitchChaseMusic;
         if (drinkItemController != null)
             drinkItemController.DrinkPurchased -= CompleteVendingTask;
         BushHideSpot2D.PlayerEnteredBush -= CompleteBushTask;
@@ -802,6 +948,8 @@ public class JikkenCommentStream : MonoBehaviour
             coffeeCupInteraction.LightActivated -= CompleteCoffeeCupTask;
         if (castleInteraction != null)
             castleInteraction.LightActivated -= CompleteCastleTask;
+        if (gameClearGoal != null)
+            gameClearGoal.GoalReached -= CompleteEscapeTask;
     }
 
     private static Sprite GetTaskDestinationMarkerSprite()
@@ -935,6 +1083,7 @@ public class JikkenCommentStream : MonoBehaviour
             return;
 
         ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        PlayCommentAppearedSound();
         worldTaskGuidanceTimer = tutorialMessageInterval;
     }
 
@@ -969,6 +1118,15 @@ public class JikkenCommentStream : MonoBehaviour
     {
         if (selectedTask == null ||
             selectedTask.completionType != TaskCompletionType.CastleLight)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteEscapeTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.EscapeGoal)
             return;
 
         CompleteActiveTask();
@@ -1045,11 +1203,48 @@ public class JikkenCommentStream : MonoBehaviour
         roadMap?.SetActiveTaskTargets(new[] { castleInteraction.transform });
     }
 
+    private void TryCreateEscapeTask()
+    {
+        const string message = "脱出せよ";
+        CreateSelectableTaskComment(message,
+            rect => AcceptEscapeTask(rect, message));
+    }
+
+    private void AcceptEscapeTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask())
+            return;
+
+        if (gameClearGoal == null)
+        {
+            gameClearGoal = FindFirstObjectByType<SubjiGameClearGoal>();
+            if (gameClearGoal != null)
+                gameClearGoal.GoalReached += CompleteEscapeTask;
+        }
+        if (gameClearGoal == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.EscapeGoal,
+            subscriberReward = 0
+        });
+
+        gameClearGoal.SetGoalActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { gameClearGoal.GoalTransform });
+    }
+
     private void CompleteActiveTask()
     {
         if (selectedTask == null)
             return;
 
+        PlayTaskCompletedSound();
         AcceptedTask completedTask = selectedTask;
         selectedTask = null;
         activeWorldTaskGuidance = null;
@@ -1088,6 +1283,9 @@ public class JikkenCommentStream : MonoBehaviour
         else if (completedTask.completionType == TaskCompletionType.CastleLight)
         {
             castleInteraction?.SetTaskActive(false);
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTask14);
+            TryCreateEscapeTask();
         }
 
         TrySpawnGreenGuard();
@@ -1223,6 +1421,40 @@ public class JikkenCommentStream : MonoBehaviour
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0.5f, 1f);
         rect.sizeDelta = new Vector2(0f, commentHeight);
+
+        TextMeshProUGUI label = rect.GetComponent<TextMeshProUGUI>();
+        if (label != null)
+        {
+            label.textWrappingMode = TextWrappingModes.Normal;
+            label.overflowMode = TextOverflowModes.Overflow;
+        }
+        UpdateListItemHeight(rect);
+    }
+
+    private void UpdateListItemHeight(RectTransform rect)
+    {
+        if (rect == null)
+            return;
+
+        TextMeshProUGUI label = rect.GetComponent<TextMeshProUGUI>();
+        RectTransform parentRect = rect.parent as RectTransform;
+        if (label == null || parentRect == null)
+            return;
+
+        float availableWidth = parentRect.rect.width;
+        if (availableWidth <= 1f)
+        {
+            Rect panelLayout = parentRect == taskContent
+                ? taskPanelRect
+                : commentPanelRect;
+            availableWidth = Screen.width * panelLayout.width -
+                panelContentPadding * 2f;
+        }
+        availableWidth = Mathf.Max(1f, availableWidth);
+        float preferredHeight = label.GetPreferredValues(
+            label.text, availableWidth, 0f).y;
+        rect.sizeDelta = new Vector2(0f,
+            Mathf.Max(commentHeight, Mathf.Ceil(preferredHeight) + 12f));
     }
 
     private void ArrangeComments()
@@ -1232,9 +1464,15 @@ public class JikkenCommentStream : MonoBehaviour
             if (comments[i] == null)
             {
                 comments.RemoveAt(i);
-                continue;
             }
-            comments[i].anchoredPosition = new Vector2(0f, -(i * commentHeight));
+        }
+
+        float verticalOffset = 0f;
+        for (int i = 0; i < comments.Count; i++)
+        {
+            UpdateListItemHeight(comments[i]);
+            comments[i].anchoredPosition = new Vector2(0f, -verticalOffset);
+            verticalOffset += comments[i].sizeDelta.y;
         }
     }
 

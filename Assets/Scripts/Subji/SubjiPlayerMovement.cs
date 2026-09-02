@@ -42,7 +42,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     public Key nightVisionToggleKey = Key.P;
 
     [Tooltip("ライト消灯中の最小視野半径")]
-    [Min(0.1f)] public float playerVisionRadius = 1f;
+    [Min(0.1f)] public float playerVisionRadius = 2f;
 
     [Tooltip("視野境界のぼかし幅")]
     [Min(0.1f)] public float visionGradientWidth = 1.3f;
@@ -65,7 +65,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Tooltip("敵の正面視野と同じ、ライトの照射角度")]
     [Range(1f, 180f)] public float lightViewAngle = 30f;
     [Tooltip("敵の正面視野と同じ、ライトの照射距離")]
-    [Min(0.1f)] public float lightViewDistance = 5.5f;
+    [Min(0.1f)] public float lightViewDistance = 6.5f;
 
     [Header("敵の初期設定")]
     [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
@@ -121,6 +121,37 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public bool IsHidden { get; private set; }
+
+    public bool IsWorldPositionIlluminated(Vector2 worldPosition)
+    {
+        if (!enableNightVision)
+            return true;
+
+        Vector2 fromPlayer = worldPosition - (Vector2)transform.position;
+        if (fromPlayer.sqrMagnitude <= playerVisionRadius * playerVisionRadius)
+            return true;
+
+        if (isLightOn && fromPlayer.sqrMagnitude <=
+            lightViewDistance * lightViewDistance)
+        {
+            Vector2 direction = fromPlayer.normalized;
+            float minimumDot = Mathf.Cos(lightViewAngle * 0.5f * Mathf.Deg2Rad);
+            if (Vector2.Dot(flashlightDirection, direction) >= minimumDot)
+                return true;
+        }
+
+        foreach (SubjiPlacedLight placedLight in SubjiPlacedLight.ActiveLights)
+        {
+            if (placedLight == null)
+                continue;
+            float radius = Mathf.Max(0.1f, placedLight.radius);
+            if (((Vector2)placedLight.transform.position - worldPosition).sqrMagnitude <=
+                radius * radius)
+                return true;
+        }
+
+        return false;
+    }
     public bool IsSpeedBoosting { get; private set; }
     public float SpeedBoostAmount => speedBoostAmount;
     public bool IsStaminaFrozen => Time.time < staminaFreezeEndTime;

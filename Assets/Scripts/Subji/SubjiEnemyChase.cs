@@ -4,6 +4,8 @@ using UnityEngine;
 public class SubjiEnemyChase : MonoBehaviour
 {
     public static readonly HashSet<SubjiEnemyChase> ActiveEnemies = new();
+    private static readonly HashSet<SubjiEnemyChase> ChasingEnemies = new();
+    public static event System.Action<bool> AnyEnemyChasingChanged;
     public enum MovementType
     {
         PatrolAndChase,
@@ -19,11 +21,13 @@ public class SubjiEnemyChase : MonoBehaviour
         [InspectorName("ID6・7完了後")]
         AfterTasks6And7,
         [InspectorName("ID12完了後")]
-        AfterTask12
+        AfterTask12,
+        [InspectorName("ID14完了後")]
+        AfterTask14
     }
 
     [Header("出現タイミング")]
-    [Tooltip("この敵をゲーム開始時、ID6・7完了後、ID12完了後のどこで出現させるか選びます")]
+    [Tooltip("この敵をゲーム開始時、ID6・7完了後、ID12完了後、ID14完了後のどこで出現させるか選びます")]
     public SpawnTiming spawnTiming = SpawnTiming.GameStart;
 
     [Header("個体の行動タイプ")]
@@ -73,6 +77,13 @@ public class SubjiEnemyChase : MonoBehaviour
     [Min(0f)] public float chaseMemorySeconds = 1.5f;
     [Tooltip("通常敵の索敵判定間隔。毎フレーム索敵しません")]
     [Min(0.05f)] public float detectionCheckInterval = 0.2f;
+    [Tooltip("敵の表示をライト範囲と照合する間隔")]
+    [Min(0.05f)] public float lightVisibilityCheckInterval = 0.1f;
+
+    [Header("発見音")]
+    [Tooltip("プレイヤーを新しく発見した瞬間に再生します。未設定時は共通の発見音を使用します")]
+    public AudioClip playerSpottedSound;
+    [Range(0f, 1f)] public float playerSpottedVolume = 1f;
 
     [Header("Target")]
     public Transform player;
@@ -122,6 +133,10 @@ public class SubjiEnemyChase : MonoBehaviour
     private Vector3 lastCirclePosition = new(float.PositiveInfinity, 0f, 0f);
     private float lastCircleRadius = -1f;
     private bool playerInsideDetectionTrigger;
+    private bool wasPlayerDetected;
+    private AudioSource playerSpottedAudioSource;
+    private bool isRegisteredAsChasing;
+    private float nextLightVisibilityCheckTime;
 
     public float CurrentDetectionRadius
     {
@@ -135,6 +150,7 @@ public class SubjiEnemyChase : MonoBehaviour
     void Awake()
     {
         ApplyAppearanceAndCollider();
+        ConfigurePlayerSpottedAudio();
     }
 
 #if UNITY_EDITOR
@@ -223,6 +239,13 @@ public class SubjiEnemyChase : MonoBehaviour
         if (player == null)
             return;
 
+        if (Time.time >= nextLightVisibilityCheckTime)
+        {
+            nextLightVisibilityCheckTime = Time.time +
+                lightVisibilityCheckInterval;
+            UpdateLightVisibility();
+        }
+
         if (movementType == MovementType.GuardPost)
         {
             UpdateGuardBehaviour();
@@ -241,6 +264,8 @@ public class SubjiEnemyChase : MonoBehaviour
         {
             chaseMemoryTimer = 0f;
             cachedPlayerDetected = false;
+            SetPlayerDetected(false);
+            SetChasingState(false);
             if (movementType == MovementType.PatrolAndChase)
                 UpdatePatrol();
             return;
@@ -253,6 +278,7 @@ public class SubjiEnemyChase : MonoBehaviour
                 (useRadialDetection ||
                  (visionCone != null && visionCone.isActiveAndEnabled &&
                   visionCone.ContainsDirection(player.position)));
+            SetPlayerDetected(cachedPlayerDetected);
 
             if (cachedPlayerDetected)
                 chaseMemoryTimer = chaseMemorySeconds;
@@ -262,7 +288,10 @@ public class SubjiEnemyChase : MonoBehaviour
             chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
 
         bool isChasing = cachedPlayerDetected || chaseMemoryTimer > 0f;
-        if (isChasing && movementType != MovementType.CompletelyStationary)
+        bool canChase = isChasing &&
+            movementType != MovementType.CompletelyStationary;
+        SetChasingState(canChase);
+        if (canChase)
         {
             MoveAlongRoad(player.position, GetChaseSpeed(), true);
             return;
@@ -278,23 +307,28 @@ public class SubjiEnemyChase : MonoBehaviour
         if (playerHidden)
         {
             chaseMemoryTimer = 0f;
+            SetPlayerDetected(false);
         }
         else if (Time.time >= nextGuardDetectionCheckTime)
         {
             nextGuardDetectionCheckTime = Time.time + guardDetectionCheckInterval;
-            if (playerInsideDetectionTrigger && visionCone != null &&
+            bool playerDetected = playerInsideDetectionTrigger && visionCone != null &&
                 visionCone.isActiveAndEnabled &&
-                visionCone.ContainsDirection(player.position))
+                visionCone.ContainsDirection(player.position);
+            SetPlayerDetected(playerDetected);
+            if (playerDetected)
                 chaseMemoryTimer = chaseMemorySeconds;
         }
 
         if (chaseMemoryTimer > 0f && !playerHidden)
         {
+            SetChasingState(true);
             chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
             MoveAlongRoad(player.position, GetChaseSpeed(), true);
             return;
         }
 
+        SetChasingState(false);
         UpdateGuardPost();
     }
 
@@ -433,13 +467,76 @@ public class SubjiEnemyChase : MonoBehaviour
     {
         ActiveEnemies.Remove(this);
         playerInsideDetectionTrigger = false;
+        wasPlayerDetected = false;
+        SetChasingState(false);
     }
 
     public void SetPlayerInsideDetectionTrigger(bool inside)
     {
         playerInsideDetectionTrigger = inside;
         if (!inside)
+        {
             cachedPlayerDetected = false;
+            SetPlayerDetected(false);
+        }
+    }
+
+    private void ConfigurePlayerSpottedAudio()
+    {
+        if (playerSpottedSound == null)
+            playerSpottedSound = Resources.Load<AudioClip>("Audio/enemy_spotted");
+
+        playerSpottedAudioSource = gameObject.AddComponent<AudioSource>();
+        playerSpottedAudioSource.playOnAwake = false;
+        playerSpottedAudioSource.loop = false;
+        playerSpottedAudioSource.spatialBlend = 0f;
+    }
+
+    private void SetPlayerDetected(bool detected)
+    {
+        if (detected && !wasPlayerDetected && playerSpottedSound != null &&
+            playerSpottedAudioSource != null)
+        {
+            playerSpottedAudioSource.PlayOneShot(
+                playerSpottedSound, playerSpottedVolume);
+        }
+
+        wasPlayerDetected = detected;
+    }
+
+    private void SetChasingState(bool chasing)
+    {
+        if (isRegisteredAsChasing == chasing)
+            return;
+
+        bool hadChasingEnemy = ChasingEnemies.Count > 0;
+        isRegisteredAsChasing = chasing;
+        if (chasing)
+            ChasingEnemies.Add(this);
+        else
+            ChasingEnemies.Remove(this);
+
+        bool hasChasingEnemy = ChasingEnemies.Count > 0;
+        if (hadChasingEnemy != hasChasingEnemy)
+            AnyEnemyChasingChanged?.Invoke(hasChasingEnemy);
+    }
+
+    private void UpdateLightVisibility()
+    {
+        if (enemyRenderer == null)
+            return;
+
+        if (playerMovement == null && player != null)
+            playerMovement = player.GetComponent<SubjiPlayerMovement>();
+        bool isIlluminated = playerMovement == null ||
+            playerMovement.IsWorldPositionIlluminated(transform.position);
+        enemyRenderer.enabled = isIlluminated;
+        if (detectionCircle != null)
+        {
+            detectionCircle.enabled = isIlluminated && showDetectionRadius &&
+                movementType != MovementType.GuardPost;
+        }
+        visionCone?.SetVisualVisible(isIlluminated && useTemporaryVisionCone);
     }
 
     private void OnTriggerStay2D(Collider2D other)

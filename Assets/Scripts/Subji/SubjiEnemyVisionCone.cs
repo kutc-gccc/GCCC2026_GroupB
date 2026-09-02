@@ -99,6 +99,12 @@ public class SubjiEnemyVisionCone : MonoBehaviour
         UpdateMesh();
     }
 
+    public void SetVisualVisible(bool visible)
+    {
+        if (viewRenderer != null)
+            viewRenderer.enabled = visible;
+    }
+
     private void CreateVisual()
     {
         GameObject visual = new GameObject("Temporary Vision Cone");

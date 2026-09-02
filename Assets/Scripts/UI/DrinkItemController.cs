@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -8,11 +9,15 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public sealed class DrinkItemController : MonoBehaviour
 {
+    public event Action DrinkPurchased;
+
     [Header("Vending Machine")]
     [SerializeField] private Key purchaseKey = Key.E;
     [Min(0.1f)]
     [FormerlySerializedAs("purchaseDistance")]
     [SerializeField] private float purchaseRange = 2f;
+    [Min(0.1f)]
+    [SerializeField] private float purchaseDuration = 2f;
 
     [Header("Drink Slots (left is 1)")]
     [Min(1)]
@@ -32,11 +37,26 @@ public sealed class DrinkItemController : MonoBehaviour
     private ItemSlotSelector selector;
     private SubjiPlayerMovement player;
     private VendingMachinePurchaseZone[] vendingZones;
+    private TimedWorldInteraction timedInteraction;
+
+    public Transform[] GetVendingMachineTransforms()
+    {
+        if (vendingZones == null || vendingZones.Length == 0)
+            SetupVendingZones();
+
+        return vendingZones
+            .Where(zone => zone != null)
+            .Select(zone => zone.transform)
+            .ToArray();
+    }
 
     private void Awake()
     {
         selector = GetComponent<ItemSlotSelector>();
         player = FindFirstObjectByType<SubjiPlayerMovement>();
+        if (player != null)
+            timedInteraction = player.GetComponent<TimedWorldInteraction>() ??
+                player.gameObject.AddComponent<TimedWorldInteraction>();
         SetupVendingZones();
         FindDrinkIcons();
     }
@@ -65,8 +85,17 @@ public sealed class DrinkItemController : MonoBehaviour
         if (vendingZones == null || vendingZones.Length == 0)
             SetupVendingZones();
 
+        // E入力が重なる場所では、ブッシュへの出入りを優先する。
+        if (BushHideSpot2D.IsPlayerWithinInteractionRange(player))
+            return;
+
         if (vendingZones.Any(zone => zone != null && zone.IsPlayerInside))
-            PurchaseDrink();
+        {
+            if (timedInteraction == null)
+                timedInteraction = player.GetComponent<TimedWorldInteraction>() ??
+                    player.gameObject.AddComponent<TimedWorldInteraction>();
+            timedInteraction.Begin(purchaseDuration, PurchaseDrink);
+        }
     }
 
     private void PurchaseDrink()
@@ -78,6 +107,7 @@ public sealed class DrinkItemController : MonoBehaviour
                 continue;
 
             icon.gameObject.SetActive(true);
+            DrinkPurchased?.Invoke();
             return;
         }
     }

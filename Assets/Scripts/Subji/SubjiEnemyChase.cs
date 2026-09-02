@@ -8,8 +8,23 @@ public class SubjiEnemyChase : MonoBehaviour
     {
         PatrolAndChase,
         WaitUntilPlayerFound,
+        GuardPost,
         CompletelyStationary
     }
+
+    public enum SpawnTiming
+    {
+        [InspectorName("ゲーム開始時")]
+        GameStart,
+        [InspectorName("ID6・7完了後")]
+        AfterTasks6And7,
+        [InspectorName("ID12完了後")]
+        AfterTask12
+    }
+
+    [Header("出現タイミング")]
+    [Tooltip("この敵をゲーム開始時、ID6・7完了後、ID12完了後のどこで出現させるか選びます")]
+    public SpawnTiming spawnTiming = SpawnTiming.GameStart;
 
     [Header("個体の行動タイプ")]
     [Tooltip("徘徊型、発見まで停止する型、完全停止型から選びます")]
@@ -42,14 +57,30 @@ public class SubjiEnemyChase : MonoBehaviour
 
     [Tooltip("プレイヤー追跡中の移動速度")]
     [Min(0f)] public float chaseSpeed = 3f;
+    [Tooltip("追跡速度をプレイヤーの通常移動速度に合わせます")]
+    public bool matchPlayerMoveSpeed;
+    [Tooltip("警備型が見失った後、配置地点へ戻る速度")]
+    [Min(0f)] public float returnSpeed = 1f;
+    [Tooltip("警備型が視野を上下左右へ切り替える間隔")]
+    [Min(0.1f)] public float guardLookInterval = 1.5f;
+    [Tooltip("警備型の索敵判定間隔。待機中は毎フレーム判定しません")]
+    [Min(0.05f)] public float guardDetectionCheckInterval = 0.2f;
+    [Tooltip("警備型が追跡・帰還経路を再計算する間隔")]
+    [Min(0.1f)] public float guardPathRefreshInterval = 0.5f;
+    [Tooltip("円形の索敵も使うか。警備型の正面監視ではオフを推奨します")]
+    public bool useRadialDetection = true;
     [Tooltip("発見範囲から外れた後も追跡を続ける時間")]
     [Min(0f)] public float chaseMemorySeconds = 1.5f;
+    [Tooltip("通常敵の索敵判定間隔。毎フレーム索敵しません")]
+    [Min(0.05f)] public float detectionCheckInterval = 0.2f;
 
     [Header("Target")]
     public Transform player;
     [HideInInspector] public SubjiRoadMap roadMap;
 
     [Header("Detection Circle Appearance")]
+    [Tooltip("索敵円を表示します。敵が多い場合はオフを推奨します")]
+    public bool showDetectionRadius;
     [Range(0.01f, 0.5f)] public float circleWidth = 0.12f;
 
     [Header("仮の正面視野（実験機能）")]
@@ -68,15 +99,29 @@ public class SubjiEnemyChase : MonoBehaviour
     private Vector2 patrolDestination;
     private float patrolWaitTimer;
     private float chaseMemoryTimer;
+    private float nextDetectionCheckTime;
+    private float nextDetectionVisualUpdateTime;
+    private bool cachedPlayerDetected;
     private bool hasPatrolDestination;
-    private Vector2 cachedObstacleWaypoint;
-    private Vector2 cachedPathGoal;
-    private float nextPathRefreshTime;
-    private static InvisibleWall2D[] cachedWalls;
-    private static float nextWallCacheRefreshTime;
+    private Vector2 homePosition;
+    private float nextGuardLookTime;
+    private float nextGuardDetectionCheckTime;
+    private int guardLookIndex;
+    private static readonly Vector2[] GuardLookDirections =
+    {
+        Vector2.up, Vector2.right, Vector2.down, Vector2.left
+    };
+    private Vector2 movementExtents;
+    private Vector2 avoidanceDirection;
+    private float avoidanceUntil;
+    private Vector2 avoidanceGoal;
+    private bool hasAvoidanceGoal;
+    private int avoidanceDirectionChanges;
+    private readonly RaycastHit2D[] wallCastHits = new RaycastHit2D[8];
     private const int CircleSegments = 32;
     private Vector3 lastCirclePosition = new(float.PositiveInfinity, 0f, 0f);
     private float lastCircleRadius = -1f;
+    private bool playerInsideDetectionTrigger;
 
     public float CurrentDetectionRadius
     {
@@ -96,6 +141,9 @@ public class SubjiEnemyChase : MonoBehaviour
     void OnValidate()
     {
         ApplyAppearanceAndCollider();
+        movementExtents = enemyRenderer != null
+            ? (Vector2)enemyRenderer.bounds.extents
+            : Vector2.zero;
     }
 #endif
 
@@ -149,51 +197,129 @@ public class SubjiEnemyChase : MonoBehaviour
         if (roadMap == null)
             roadMap = FindFirstObjectByType<SubjiRoadMap>();
 
-        if (roadMap != null)
+        if (roadMap != null && movementType != MovementType.GuardPost)
         {
             Vector2 extents = enemyRenderer != null ? enemyRenderer.bounds.extents : Vector2.zero;
             transform.position = roadMap.GetClosestPointOnRoad(transform.position, extents);
         }
 
         CreateDetectionCircle();
+        CreateDetectionTrigger();
         CreateTemporaryVisionCone();
+        homePosition = transform.position;
+        if (movementType == MovementType.GuardPost)
+        {
+            nextGuardLookTime = Time.time + guardLookInterval;
+            nextGuardDetectionCheckTime = Time.time;
+            visionCone?.SetFacingDirection(GuardLookDirections[guardLookIndex]);
+            if (detectionCircle != null)
+                detectionCircle.enabled = false;
+        }
         ChooseNextPatrolDestination();
     }
 
     void Update()
     {
-        if (player == null || detectionCircle == null)
+        if (player == null)
             return;
+
+        if (movementType == MovementType.GuardPost)
+        {
+            UpdateGuardBehaviour();
+            return;
+        }
 
         float activeRadius = CurrentDetectionRadius;
 
-        UpdateDetectionCircle(activeRadius);
+        if (detectionCircle != null && Time.time >= nextDetectionVisualUpdateTime)
+        {
+            UpdateDetectionCircle(activeRadius);
+            nextDetectionVisualUpdateTime = Time.time + detectionCheckInterval;
+        }
 
         if (playerMovement != null && playerMovement.IsHidden)
         {
             chaseMemoryTimer = 0f;
+            cachedPlayerDetected = false;
             if (movementType == MovementType.PatrolAndChase)
                 UpdatePatrol();
             return;
         }
 
-        float distance = Vector2.Distance(transform.position, player.position);
-        bool isInsideVisionCone = visionCone != null &&
-            visionCone.isActiveAndEnabled && visionCone.Contains(player.position);
-        if (distance <= activeRadius || isInsideVisionCone)
-            chaseMemoryTimer = chaseMemorySeconds;
-        else
+        if (Time.time >= nextDetectionCheckTime)
+        {
+            nextDetectionCheckTime = Time.time + detectionCheckInterval;
+            cachedPlayerDetected = playerInsideDetectionTrigger &&
+                (useRadialDetection ||
+                 (visionCone != null && visionCone.isActiveAndEnabled &&
+                  visionCone.ContainsDirection(player.position)));
+
+            if (cachedPlayerDetected)
+                chaseMemoryTimer = chaseMemorySeconds;
+        }
+
+        if (!cachedPlayerDetected)
             chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
 
-        bool isChasing = distance <= activeRadius || isInsideVisionCone || chaseMemoryTimer > 0f;
+        bool isChasing = cachedPlayerDetected || chaseMemoryTimer > 0f;
         if (isChasing && movementType != MovementType.CompletelyStationary)
         {
-            MoveAlongRoad(player.position, chaseSpeed);
+            MoveAlongRoad(player.position, GetChaseSpeed(), true);
             return;
         }
 
         if (movementType == MovementType.PatrolAndChase)
             UpdatePatrol();
+    }
+
+    void UpdateGuardBehaviour()
+    {
+        bool playerHidden = playerMovement != null && playerMovement.IsHidden;
+        if (playerHidden)
+        {
+            chaseMemoryTimer = 0f;
+        }
+        else if (Time.time >= nextGuardDetectionCheckTime)
+        {
+            nextGuardDetectionCheckTime = Time.time + guardDetectionCheckInterval;
+            if (playerInsideDetectionTrigger && visionCone != null &&
+                visionCone.isActiveAndEnabled &&
+                visionCone.ContainsDirection(player.position))
+                chaseMemoryTimer = chaseMemorySeconds;
+        }
+
+        if (chaseMemoryTimer > 0f && !playerHidden)
+        {
+            chaseMemoryTimer = Mathf.Max(0f, chaseMemoryTimer - Time.deltaTime);
+            MoveAlongRoad(player.position, GetChaseSpeed(), true);
+            return;
+        }
+
+        UpdateGuardPost();
+    }
+
+    void UpdateGuardPost()
+    {
+        if (((Vector2)transform.position - homePosition).sqrMagnitude > 0.04f)
+        {
+            MoveAlongRoad(homePosition, returnSpeed);
+            return;
+        }
+
+        transform.position = homePosition;
+        if (Time.time < nextGuardLookTime)
+            return;
+
+        guardLookIndex = (guardLookIndex + 1) % GuardLookDirections.Length;
+        visionCone?.SetFacingDirection(GuardLookDirections[guardLookIndex]);
+        nextGuardLookTime = Time.time + guardLookInterval;
+    }
+
+    float GetChaseSpeed()
+    {
+        return matchPlayerMoveSpeed && playerMovement != null
+            ? playerMovement.moveSpeed
+            : chaseSpeed;
     }
 
     void UpdatePatrol()
@@ -230,119 +356,120 @@ public class SubjiEnemyChase : MonoBehaviour
         hasPatrolDestination = true;
     }
 
-    void MoveAlongRoad(Vector2 destination, float speed)
+    void MoveAlongRoad(Vector2 destination, float speed, bool isChasing = false)
     {
         Vector2 currentPosition = transform.position;
-        Vector2 extents = enemyRenderer != null ? enemyRenderer.bounds.extents : Vector2.zero;
-        // 中心同士を無理に一致させず、敵が道路内に収まれる領域の中から
-        // プレイヤーとの重なり面積が最大になる（中心距離が最小の）位置を選ぶ。
-        Vector2 reachableDestination = roadMap != null
-            ? roadMap.GetClosestPointOnRoad(destination, extents)
-            : destination;
-        Vector2 pathPoint = roadMap != null
-            ? roadMap.GetShortestPathPoint(currentPosition, reachableDestination, extents)
-            : reachableDestination;
-        if (Time.time >= nextPathRefreshTime || Vector2.Distance(cachedPathGoal, pathPoint) > 0.5f)
+        Vector2 toDestination = destination - currentPosition;
+        if (!hasAvoidanceGoal ||
+            (!isChasing && (avoidanceGoal - destination).sqrMagnitude > 0.25f))
         {
-            cachedPathGoal = pathPoint;
-            cachedObstacleWaypoint = GetObstacleWaypoint(currentPosition, pathPoint, extents);
-            nextPathRefreshTime = Time.time + 0.25f;
+            avoidanceGoal = destination;
+            hasAvoidanceGoal = true;
+            avoidanceDirectionChanges = 0;
         }
-        pathPoint = cachedObstacleWaypoint;
-        Vector2 desiredPosition = Vector2.MoveTowards(currentPosition, pathPoint,
-            speed * Time.deltaTime);
+        float step = speed * Time.deltaTime;
+        if (toDestination.sqrMagnitude <= step * step)
+        {
+            transform.position = destination;
+            return;
+        }
 
-        if (roadMap != null)
-            desiredPosition = roadMap.ConstrainToRoad(currentPosition, desiredPosition, extents);
+        Vector2 moveDirection = Time.time < avoidanceUntil
+            ? avoidanceDirection
+            : toDestination.normalized;
+        if (WallImmediatelyAhead(moveDirection, step + 0.05f))
+        {
+            avoidanceDirectionChanges++;
+            if (avoidanceDirectionChanges >= 4)
+            {
+                avoidanceDirectionChanges = 0;
+                avoidanceUntil = 0f;
+                if (isChasing)
+                {
+                    chaseMemoryTimer = 0f;
+                    cachedPlayerDetected = false;
+                    if (movementType == MovementType.PatrolAndChase)
+                        ChooseNextPatrolDestination();
+                }
+                else if (movementType == MovementType.PatrolAndChase)
+                {
+                    ChooseNextPatrolDestination();
+                }
+                return;
+            }
+
+            Vector2 perpendicular = new(-moveDirection.y, moveDirection.x);
+            if (Time.time < avoidanceUntil || (GetInstanceID() & 1) == 0)
+                perpendicular = -perpendicular;
+            avoidanceDirection = perpendicular;
+            avoidanceUntil = Time.time + 0.6f;
+            moveDirection = avoidanceDirection;
+        }
+
+        Vector2 desiredPosition = currentPosition + moveDirection * step;
 
         transform.position = desiredPosition;
     }
 
-    void OnEnable() => ActiveEnemies.Add(this);
-    void OnDisable() => ActiveEnemies.Remove(this);
-
-    static Vector2 GetObstacleWaypoint(Vector2 start, Vector2 goal, Vector2 extents)
+    private bool WallImmediatelyAhead(Vector2 direction, float distance)
     {
-        if (cachedWalls == null || Time.time >= nextWallCacheRefreshTime ||
-            System.Array.Exists(cachedWalls, wall => wall == null))
+        if (contactCollider == null || direction.sqrMagnitude <= Mathf.Epsilon)
+            return false;
+
+        ContactFilter2D filter = ContactFilter2D.noFilter;
+        filter.useTriggers = false;
+        int hitCount = contactCollider.Cast(direction, filter, wallCastHits, distance);
+        for (int i = 0; i < hitCount; i++)
         {
-            cachedWalls = FindObjectsByType<InvisibleWall2D>(FindObjectsSortMode.None);
-            nextWallCacheRefreshTime = Time.time + 1f;
+            if (wallCastHits[i].collider != null &&
+                wallCastHits[i].collider.GetComponent<InvisibleWall2D>() != null)
+                return true;
         }
-        if (cachedWalls.Length == 0)
-            return goal;
-
-        List<Bounds> obstacles = new();
-        List<Vector2> nodes = new() { start, goal };
-        foreach (InvisibleWall2D wall in cachedWalls)
-        {
-            if (wall == null)
-                continue;
-
-            BoxCollider2D box = wall.GetComponent<BoxCollider2D>();
-            if (box == null || !box.enabled)
-                continue;
-            Bounds bounds = box.bounds;
-            bounds.Expand(new Vector3(extents.x * 2f + 0.12f, extents.y * 2f + 0.12f));
-            obstacles.Add(bounds);
-            const float cornerGap = 0.03f;
-            nodes.Add(new Vector2(bounds.min.x - cornerGap, bounds.min.y - cornerGap));
-            nodes.Add(new Vector2(bounds.min.x - cornerGap, bounds.max.y + cornerGap));
-            nodes.Add(new Vector2(bounds.max.x + cornerGap, bounds.min.y - cornerGap));
-            nodes.Add(new Vector2(bounds.max.x + cornerGap, bounds.max.y + cornerGap));
-        }
-
-        if (SegmentIsClear(start, goal, obstacles))
-            return goal;
-
-        int count = nodes.Count;
-        float[] distance = new float[count];
-        int[] previous = new int[count];
-        bool[] visited = new bool[count];
-        for (int i = 0; i < count; i++) { distance[i] = float.PositiveInfinity; previous[i] = -1; }
-        distance[0] = 0f;
-
-        for (int step = 0; step < count; step++)
-        {
-            int current = -1;
-            for (int i = 0; i < count; i++)
-                if (!visited[i] && (current < 0 || distance[i] < distance[current])) current = i;
-            if (current < 0 || float.IsInfinity(distance[current]) || current == 1) break;
-            visited[current] = true;
-            for (int next = 0; next < count; next++)
-            {
-                if (next == current || visited[next] || !SegmentIsClear(nodes[current], nodes[next], obstacles))
-                    continue;
-                float candidate = distance[current] + Vector2.Distance(nodes[current], nodes[next]);
-                if (candidate < distance[next]) { distance[next] = candidate; previous[next] = current; }
-            }
-        }
-
-        if (previous[1] < 0)
-            return start;
-        int waypoint = 1;
-        while (previous[waypoint] > 0) waypoint = previous[waypoint];
-        return nodes[waypoint];
+        return false;
     }
 
-    static bool SegmentIsClear(Vector2 from, Vector2 to, List<Bounds> obstacles)
+    void OnEnable() => ActiveEnemies.Add(this);
+    void OnDisable()
     {
-        foreach (Bounds bounds in obstacles)
-        {
-            if (bounds.Contains(from) || bounds.Contains(to))
-                continue;
-            Vector2 direction = to - from;
-            float length = direction.magnitude;
-            if (length <= 0.001f) continue;
-            Ray ray = new(from, direction / length);
-            if (bounds.IntersectRay(ray, out float hitDistance) && hitDistance < length)
-                return false;
-        }
-        return true;
+        ActiveEnemies.Remove(this);
+        playerInsideDetectionTrigger = false;
+    }
+
+    public void SetPlayerInsideDetectionTrigger(bool inside)
+    {
+        playerInsideDetectionTrigger = inside;
+        if (!inside)
+            cachedPlayerDetected = false;
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        SubjiPlayerMovement contactedPlayer =
+            other.GetComponentInParent<SubjiPlayerMovement>();
+        if (contactedPlayer == null || contactedPlayer.IsHidden)
+            return;
+
+        Bounds playerBounds = other.bounds;
+        float playerArea = playerBounds.size.x * playerBounds.size.y;
+        if (playerArea <= Mathf.Epsilon)
+            return;
+
+        Bounds enemyBounds = GetContactBounds();
+        float width = Mathf.Max(0f, Mathf.Min(playerBounds.max.x, enemyBounds.max.x) -
+            Mathf.Max(playerBounds.min.x, enemyBounds.min.x));
+        float height = Mathf.Max(0f, Mathf.Min(playerBounds.max.y, enemyBounds.max.y) -
+            Mathf.Max(playerBounds.min.y, enemyBounds.min.y));
+        if (width * height / playerArea < contactedPlayer.enemyOverlapThreshold)
+            return;
+
+        contactedPlayer.GetComponent<SubjiGameClearGoal>()?.GameOver();
     }
 
     void CreateDetectionCircle()
     {
+        if (!showDetectionRadius)
+            return;
+
         GameObject circleObject = new GameObject("Player Detection Radius");
         detectionCircle = circleObject.AddComponent<LineRenderer>();
         detectionCircle.loop = true;
@@ -354,6 +481,23 @@ public class SubjiEnemyChase : MonoBehaviour
         detectionCircle.material = new Material(Shader.Find("Sprites/Default"));
 
         UpdateDetectionCircle(idleDetectionRadius);
+    }
+
+    void CreateDetectionTrigger()
+    {
+        GameObject triggerObject = new GameObject("Enemy Detection Trigger");
+        triggerObject.transform.SetParent(transform, false);
+        Vector3 scale = transform.lossyScale;
+        triggerObject.transform.localScale = new Vector3(
+            Mathf.Approximately(scale.x, 0f) ? 1f : 1f / scale.x,
+            Mathf.Approximately(scale.y, 0f) ? 1f : 1f / scale.y, 1f);
+        CircleCollider2D trigger = triggerObject.AddComponent<CircleCollider2D>();
+        trigger.isTrigger = true;
+        trigger.radius = Mathf.Max(movingDetectionRadius, idleDetectionRadius,
+            useTemporaryVisionCone ? temporaryVisionDistance : 0f);
+        SubjiEnemyDetectionTrigger relay =
+            triggerObject.AddComponent<SubjiEnemyDetectionTrigger>();
+        relay.Configure(this);
     }
 
     void CreateTemporaryVisionCone()

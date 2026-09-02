@@ -25,6 +25,7 @@ public class SubjiEnemyVisionCone : MonoBehaviour
     private Vector2 lastMeshDirection;
     private Vector3[] meshVertices;
     private int[] meshTriangles;
+    private float nextMeshUpdateTime;
 
     private void Awake()
     {
@@ -39,8 +40,12 @@ public class SubjiEnemyVisionCone : MonoBehaviour
             FacingDirection = movement.normalized;
 
         previousPosition = transform.position;
-        if ((FacingDirection - lastMeshDirection).sqrMagnitude > 0.0001f)
+        if ((FacingDirection - lastMeshDirection).sqrMagnitude > 0.0001f &&
+            Time.time >= nextMeshUpdateTime)
+        {
             UpdateMesh();
+            nextMeshUpdateTime = Time.time + 0.1f;
+        }
     }
 
     private void OnEnable()
@@ -72,6 +77,26 @@ public class SubjiEnemyVisionCone : MonoBehaviour
             return true;
 
         return Vector2.Angle(FacingDirection, toPoint) <= viewAngle * 0.5f;
+    }
+
+    public bool ContainsDirection(Vector2 worldPoint)
+    {
+        Vector2 toPoint = worldPoint - (Vector2)transform.position;
+        float forwardDot = Vector2.Dot(FacingDirection, toPoint);
+        if (forwardDot <= 0f)
+            return false;
+
+        float cosine = Mathf.Cos(viewAngle * 0.5f * Mathf.Deg2Rad);
+        return forwardDot * forwardDot >= toPoint.sqrMagnitude * cosine * cosine;
+    }
+
+    public void SetFacingDirection(Vector2 direction)
+    {
+        if (direction.sqrMagnitude <= Mathf.Epsilon)
+            return;
+
+        FacingDirection = direction.normalized;
+        UpdateMesh();
     }
 
     private void CreateVisual()

@@ -85,6 +85,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     private Rigidbody2D rb;
     private SpriteRenderer playerRenderer;
     private Vector2 movement;
+    private bool interactionMovementLocked;
     private InputAction moveAction;
     private GUIStyle coordinateStyle;
     private GUIStyle taskCompleteStyle;
@@ -185,7 +186,9 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (!Application.isPlaying || moveAction == null)
             return;
 
-        movement = IsHidden ? Vector2.zero : moveAction.ReadValue<Vector2>().normalized;
+        movement = IsHidden || interactionMovementLocked
+            ? Vector2.zero
+            : moveAction.ReadValue<Vector2>().normalized;
         if (Keyboard.current != null &&
             Keyboard.current[nightVisionToggleKey].wasPressedThisFrame)
         {
@@ -211,8 +214,14 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     public void CompleteTask()
     {
-        AddSubscribers(subscribersPerCompletedTask);
-        lastTaskSubscriberReward = subscribersPerCompletedTask;
+        CompleteTask(subscribersPerCompletedTask);
+    }
+
+    public void CompleteTask(int subscriberReward)
+    {
+        int reward = Mathf.Max(0, subscriberReward);
+        AddSubscribers(reward);
+        lastTaskSubscriberReward = reward;
         taskCompleteMessageUntil = Time.unscaledTime + 1.3f;
     }
 
@@ -546,46 +555,6 @@ public class SubjiPlayerMovement : MonoBehaviour
         UpdateSpeedBoostGauge();
     }
 
-    void LateUpdate()
-    {
-        if (!Application.isPlaying || playerRenderer == null)
-            return;
-
-        if (IsHidden)
-            return;
-
-        Collider2D playerCollider = GetComponent<Collider2D>();
-        Bounds playerBounds = playerCollider != null ? playerCollider.bounds : playerRenderer.bounds;
-        float playerArea = playerBounds.size.x * playerBounds.size.y;
-        if (playerArea <= Mathf.Epsilon)
-            return;
-
-        foreach (SubjiEnemyChase enemy in SubjiEnemyChase.ActiveEnemies)
-        {
-            if (enemy == null)
-                continue;
-
-            Bounds enemyBounds = enemy.GetContactBounds();
-            if (enemyBounds.size.sqrMagnitude <= 0f ||
-                GetOverlapArea(playerBounds, enemyBounds) / playerArea < enemyOverlapThreshold)
-            {
-                continue;
-            }
-
-            SubjiGameClearGoal gameEnd = GetComponent<SubjiGameClearGoal>();
-            if (gameEnd != null)
-                gameEnd.GameOver();
-            return;
-        }
-    }
-
-    static float GetOverlapArea(Bounds a, Bounds b)
-    {
-        float width = Mathf.Max(0f, Mathf.Min(a.max.x, b.max.x) - Mathf.Max(a.min.x, b.min.x));
-        float height = Mathf.Max(0f, Mathf.Min(a.max.y, b.max.y) - Mathf.Max(a.min.y, b.min.y));
-        return width * height;
-    }
-
     public void SetHidden(bool hidden)
     {
         IsHidden = hidden;
@@ -594,6 +563,23 @@ public class SubjiPlayerMovement : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
         if (playerRenderer != null)
             playerRenderer.enabled = !hidden;
+    }
+
+    public bool HasMovementInput(float threshold = 0.01f)
+    {
+        return moveAction != null &&
+            moveAction.ReadValue<Vector2>().sqrMagnitude > threshold * threshold;
+    }
+
+    public void SetInteractionMovementLocked(bool locked)
+    {
+        interactionMovementLocked = locked;
+        if (!locked)
+            return;
+
+        movement = Vector2.zero;
+        if (rb != null)
+            rb.linearVelocity = Vector2.zero;
     }
 
     void FixedUpdate()

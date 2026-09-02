@@ -27,12 +27,13 @@ public class SubjiRoadMap : MonoBehaviour
 
     [Header("ミニマップの設定")]
     [Tooltip("ミニマップ機能を有効にします。現在は負荷確認のため停止しています")]
-    public bool showMinimap;
+    public bool showMinimap = true;
     [Range(100f, 400f)] public float minimapSize = 180f;
     [Range(0f, 50f)] public float minimapMargin = 16f;
     public Color minimapPlayerColor = new Color(0.15f, 0.9f, 1f, 1f);
     public Color minimapEnemyColor = new Color(1f, 0.2f, 0.2f, 1f);
     public Color minimapDestinationColor = new Color(0.2f, 1f, 0.25f, 1f);
+    public Color minimapTaskTargetColor = new Color(1f, 0.8f, 0.1f, 1f);
 
     [Header("デバッグ表示")]
     [Tooltip("敵の発見範囲をミニマップ上に表示します")]
@@ -52,7 +53,10 @@ public class SubjiRoadMap : MonoBehaviour
     private Vector2 taskDestination;
     private bool hasTaskDestination;
     private string activeTaskText;
+    private readonly List<Vector2> activeTaskTargetPositions = new List<Vector2>();
     private GameObject stageMapRoot;
+    private RenderTexture brightMinimapSnapshot;
+    private Bounds minimapCaptureBounds;
     private SubjiMovementArea2D movementArea;
 
     public Vector2 Center => center;
@@ -63,6 +67,7 @@ public class SubjiRoadMap : MonoBehaviour
 
     private void Awake()
     {
+        showMinimap = true;
         center = transform.position;
         movementArea = FindFirstObjectByType<SubjiMovementArea2D>();
         BuildRoads();
@@ -120,6 +125,57 @@ public class SubjiRoadMap : MonoBehaviour
     {
         player = target;
         RefreshStageMapSprites();
+        CaptureBrightMinimapBeforeDarkness();
+    }
+
+    private void CaptureBrightMinimapBeforeDarkness()
+    {
+        if (brightMinimapSnapshot != null)
+            return;
+
+        minimapCaptureBounds = movementArea != null
+            ? movementArea.GetWorldBounds()
+            : new Bounds(center, new Vector3(fieldSize, fieldSize, 0f));
+        float captureWidth = Mathf.Max(1f, minimapCaptureBounds.size.x);
+        float captureHeight = Mathf.Max(1f, minimapCaptureBounds.size.y);
+        float aspect = captureWidth / captureHeight;
+        int textureWidth = aspect >= 1f ? 256 : Mathf.Max(64, Mathf.RoundToInt(256f * aspect));
+        int textureHeight = aspect >= 1f ? Mathf.Max(64, Mathf.RoundToInt(256f / aspect)) : 256;
+
+        brightMinimapSnapshot = new RenderTexture(textureWidth, textureHeight, 16,
+            RenderTextureFormat.ARGB32);
+        brightMinimapSnapshot.name = "Bright Minimap Snapshot";
+        brightMinimapSnapshot.filterMode = FilterMode.Bilinear;
+        brightMinimapSnapshot.Create();
+
+        GameObject cameraObject = new GameObject("Temporary Bright Minimap Camera");
+        Camera snapshotCamera = cameraObject.AddComponent<Camera>();
+        snapshotCamera.orthographic = true;
+        snapshotCamera.orthographicSize = captureHeight * 0.5f;
+        snapshotCamera.aspect = aspect;
+        snapshotCamera.transform.position = new Vector3(minimapCaptureBounds.center.x,
+            minimapCaptureBounds.center.y, -100f);
+        snapshotCamera.clearFlags = CameraClearFlags.Depth;
+        snapshotCamera.cullingMask = ~(1 << 2);
+        snapshotCamera.allowHDR = false;
+        snapshotCamera.allowMSAA = false;
+        snapshotCamera.targetTexture = brightMinimapSnapshot;
+
+        RenderTexture previousTarget = RenderTexture.active;
+        RenderTexture.active = brightMinimapSnapshot;
+        GL.Clear(true, true, Color.clear);
+        RenderTexture.active = previousTarget;
+
+        Renderer playerRenderer = player != null ? player.GetComponent<Renderer>() : null;
+        bool restorePlayer = playerRenderer != null && playerRenderer.enabled;
+        if (restorePlayer)
+            playerRenderer.enabled = false;
+        snapshotCamera.Render();
+        if (restorePlayer && playerRenderer != null)
+            playerRenderer.enabled = true;
+
+        snapshotCamera.targetTexture = null;
+        Destroy(cameraObject);
     }
 
     private void RefreshStageMapSprites()
@@ -177,6 +233,30 @@ public class SubjiRoadMap : MonoBehaviour
     {
         hasTaskDestination = false;
         activeTaskText = null;
+    }
+
+    public void SetActiveTaskText(string taskText)
+    {
+        activeTaskText = taskText;
+    }
+
+    public void ClearActiveTaskText()
+    {
+        activeTaskText = null;
+        activeTaskTargetPositions.Clear();
+    }
+
+    public void SetActiveTaskTargets(IEnumerable<Transform> targets)
+    {
+        activeTaskTargetPositions.Clear();
+        if (targets == null)
+            return;
+
+        foreach (Transform target in targets)
+        {
+            if (target != null)
+                activeTaskTargetPositions.Add(target.position);
+        }
     }
 
     public void Configure(Transform target, Vector2 mapCenter, float size)
@@ -585,6 +665,8 @@ public class SubjiRoadMap : MonoBehaviour
         if (!Application.isPlaying || player == null)
             return;
 
+        // IMGUI内では小さいdepthほど手前に描画される。
+        GUI.depth = -1000;
         float mapSize = Mathf.Min(minimapSize, Screen.width * 0.35f, Screen.height * 0.35f);
         Rect map = new Rect(Screen.width - mapSize - minimapMargin, minimapMargin, mapSize, mapSize);
 
@@ -594,8 +676,11 @@ public class SubjiRoadMap : MonoBehaviour
             return;
         }
 
-        GUI.color = new Color(0.58f, 0.64f, 0.54f, 1f);
-        GUI.DrawTexture(map, Texture2D.whiteTexture);
+        if (brightMinimapSnapshot != null)
+        {
+            GUI.color = Color.white;
+            GUI.DrawTexture(map, brightMinimapSnapshot, ScaleMode.StretchToFill, true);
+        }
 
         GUI.BeginGroup(map);
         float scale = mapSize / fieldSize;
@@ -621,9 +706,10 @@ public class SubjiRoadMap : MonoBehaviour
             // 背景は専用カメラがTilemap、道、建物をまとめて描画する。
         }
 
-        Vector2 local = (Vector2)player.position - center;
-        float markerX = (local.x + fieldSize * 0.5f) * scale;
-        float markerY = mapSize - ((local.y + fieldSize * 0.5f) * scale);
+        float markerX = ((player.position.x - minimapCaptureBounds.min.x) /
+            Mathf.Max(0.01f, minimapCaptureBounds.size.x)) * mapSize;
+        float markerY = mapSize - ((player.position.y - minimapCaptureBounds.min.y) /
+            Mathf.Max(0.01f, minimapCaptureBounds.size.y)) * mapSize;
         // ミニマップ上にはプレイヤーの現在地だけを重ねて表示する。
         markerX = Mathf.Clamp(markerX, 7f, mapSize - 7f);
         markerY = Mathf.Clamp(markerY, 7f, mapSize - 7f);
@@ -631,6 +717,36 @@ public class SubjiRoadMap : MonoBehaviour
         GUI.DrawTexture(new Rect(markerX - 7f, markerY - 7f, 14f, 14f), Texture2D.whiteTexture);
         GUI.color = minimapPlayerColor;
         GUI.DrawTexture(new Rect(markerX - 5f, markerY - 5f, 10f, 10f), Texture2D.whiteTexture);
+
+        if (hasTaskDestination)
+        {
+            float taskX = ((taskDestination.x - minimapCaptureBounds.min.x) /
+                Mathf.Max(0.01f, minimapCaptureBounds.size.x)) * mapSize;
+            float taskY = mapSize - ((taskDestination.y - minimapCaptureBounds.min.y) /
+                Mathf.Max(0.01f, minimapCaptureBounds.size.y)) * mapSize;
+            taskX = Mathf.Clamp(taskX, 6f, mapSize - 6f);
+            taskY = Mathf.Clamp(taskY, 6f, mapSize - 6f);
+            GUI.color = minimapDestinationColor;
+            GUI.DrawTexture(new Rect(taskX - 6f, taskY - 6f, 12f, 12f),
+                Texture2D.whiteTexture);
+        }
+
+        const float targetSize = 16f;
+        foreach (Vector2 targetPosition in activeTaskTargetPositions)
+        {
+            float targetX = ((targetPosition.x - minimapCaptureBounds.min.x) /
+                Mathf.Max(0.01f, minimapCaptureBounds.size.x)) * mapSize;
+            float targetY = mapSize - ((targetPosition.y - minimapCaptureBounds.min.y) /
+                Mathf.Max(0.01f, minimapCaptureBounds.size.y)) * mapSize;
+            targetX = Mathf.Clamp(targetX, targetSize * 0.5f,
+                mapSize - targetSize * 0.5f);
+            targetY = Mathf.Clamp(targetY, targetSize * 0.5f,
+                mapSize - targetSize * 0.5f);
+            GUI.color = minimapTaskTargetColor;
+            GUI.DrawTexture(new Rect(targetX - targetSize * 0.5f,
+                targetY - targetSize * 0.5f, targetSize, targetSize),
+                Texture2D.whiteTexture);
+        }
         GUI.EndGroup();
 
         GUI.color = Color.white;
@@ -643,27 +759,8 @@ public class SubjiRoadMap : MonoBehaviour
         }
         GUI.Label(new Rect(map.x, map.y + map.height + 2f, map.width, 22f), "MINI MAP", minimapLabelStyle);
 
-        if (!string.IsNullOrWhiteSpace(activeTaskText))
-        {
-            if (activeTaskStyle == null)
-            {
-                activeTaskStyle = new GUIStyle(GUI.skin.label);
-                activeTaskStyle.alignment = TextAnchor.UpperLeft;
-                activeTaskStyle.fontStyle = FontStyle.Bold;
-                activeTaskStyle.normal.textColor = new Color(1f, 0.9f, 0.25f, 1f);
-                activeTaskStyle.wordWrap = true;
-                activeTaskStyle.padding = new RectOffset(10, 10, 8, 8);
-            }
-
-            float taskTop = map.y + map.height + 26f;
-            float taskHeight = Mathf.Max(54f, activeTaskStyle.CalcHeight(
-                new GUIContent(activeTaskText), map.width));
-            Rect taskRect = new Rect(map.x, taskTop, map.width, taskHeight);
-            GUI.color = new Color(0.02f, 0.12f, 0.22f, 0.96f);
-            GUI.DrawTexture(taskRect, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.Label(taskRect, activeTaskText, activeTaskStyle);
-        }
+        DrawActiveTaskInMinimapArea(new Rect(map.x, map.y + map.height + 26f,
+            map.width, 60f));
     }
 
     private void DrawActiveTaskInMinimapArea(Rect area)
@@ -686,6 +783,15 @@ public class SubjiRoadMap : MonoBehaviour
         GUI.color = Color.white;
         Rect threeLineArea = new Rect(area.x, area.y, area.width, 60f);
         GUI.Label(threeLineArea, activeTaskText, activeTaskStyle);
+    }
+
+    private void OnDestroy()
+    {
+        if (brightMinimapSnapshot != null)
+        {
+            brightMinimapSnapshot.Release();
+            Destroy(brightMinimapSnapshot);
+        }
     }
 
 }

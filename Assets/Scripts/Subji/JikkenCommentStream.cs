@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -10,6 +11,15 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class JikkenCommentStream : MonoBehaviour
 {
+    private enum TaskCompletionType
+    {
+        Destination,
+        VendingPurchase,
+        BushHide,
+        CoffeeCupLight,
+        CastleLight
+    }
+
     [Header("自動生成")]
     [Tooltip("オンにすると、プレイ中にタスク付きコメントと通常コメントを自動生成します")]
     public bool autoGenerateComments;
@@ -26,6 +36,10 @@ public class JikkenCommentStream : MonoBehaviour
         public Vector2 destination;
         public string displayText;
         public bool isTutorialTask;
+        public RectTransform taskView;
+        public RectTransform sourceComment;
+        public TaskCompletionType completionType;
+        public int subscriberReward = 100;
     }
 
     [Header("通常コメント")]
@@ -49,7 +63,15 @@ public class JikkenCommentStream : MonoBehaviour
     [Header("導入チュートリアル")]
     [Tooltip("コメント表のID 1～4をゲーム開始時に順番に再生します")]
     public bool playIntroTutorial = true;
+    [Tooltip("ID1を表示してからID2へ進むまでの秒数")]
+    [Min(0f)] public float introFirstMessageDuration = 4f;
     [Min(0.5f)] public float tutorialMessageInterval = 4f;
+
+    [Header("ID5～7の表示タイミング")]
+    [Tooltip("ID5を表示してからID6を表示するまでの秒数")]
+    [Min(0f)] public float id5To6Delay = 2f;
+    [Tooltip("ID6を表示してからID7を表示するまでの秒数")]
+    [Min(0f)] public float id6To7Delay = 2f;
 
     [Header("表示設定")]
     public TMP_FontAsset fontAsset;
@@ -101,9 +123,30 @@ public class JikkenCommentStream : MonoBehaviour
     private bool tutorialTaskCommentCreated;
     private bool tutorialStep3CommentCreated;
     private GameObject taskArrivalTriggerObject;
+    private static Sprite taskDestinationMarkerSprite;
+    private DrinkItemController drinkItemController;
+    private CoffeeCupLightInteraction coffeeCupInteraction;
+    private CoffeeCupLightInteraction castleInteraction;
+    private bool postTutorialTasksStarted;
+    private int postTutorialSequenceStep;
+    private float postTutorialSequenceTimer;
+    private string activeWorldTaskGuidance;
+    private float worldTaskGuidanceTimer;
+    private bool vendingTutorialCompleted;
+    private bool bushTutorialCompleted;
+    private bool greenGuardSpawned;
+    private bool coffeeCupTaskCreated;
+    private bool castleTaskCreated;
+
+    [Header("ID6・7完了後の監視敵")]
+    [Tooltip("配下にシーン配置した監視敵を置きます。複製した敵も両タスク完了時にまとめて有効化します")]
+    [SerializeField] private GameObject greenGuardContainer;
 
     private void Awake()
     {
+        if (fontAsset != null)
+            fontAsset.isMultiAtlasTexturesEnabled = true;
+
         roadMap = FindFirstObjectByType<SubjiRoadMap>();
         playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
         if (playerMovement != null)
@@ -113,6 +156,7 @@ public class JikkenCommentStream : MonoBehaviour
         {
             uiRoot.SetActive(false);
             CreatePopupUi();
+            SubscribeToWorldTasks();
             if (playIntroTutorial)
                 BeginIntroTutorial();
         }
@@ -150,6 +194,8 @@ public class JikkenCommentStream : MonoBehaviour
             return;
 
         UpdateIntroTutorial();
+        UpdatePostTutorialSequence();
+        UpdateWorldTaskGuidance();
 
         if (isOpen && Mouse.current != null &&
             Mouse.current.rightButton.wasPressedThisFrame)
@@ -265,14 +311,14 @@ public class JikkenCommentStream : MonoBehaviour
         popupRoot.SetActive(false);
     }
 
-    private void ShowPopup(string message, Color color)
+    private void ShowPopup(string message, Color color, float duration = -1f)
     {
         if (isOpen || popupRoot == null || popupLabel == null)
             return;
 
         popupLabel.text = message;
         popupLabel.color = color;
-        popupTimer = popupDuration;
+        popupTimer = duration >= 0f ? duration : popupDuration;
         popupRoot.SetActive(true);
     }
 
@@ -518,7 +564,7 @@ public class JikkenCommentStream : MonoBehaviour
     private void BeginIntroTutorial()
     {
         tutorialStep = 1;
-        tutorialTimer = 4f;
+        tutorialTimer = introFirstMessageDuration;
         AddTutorialHistoryComment("wasdでキャラを動かしてみよう", normalTextColor);
         ShowPopup("wasdでキャラを動かしてみよう", normalTextColor);
         popupTimer = tutorialTimer;
@@ -568,12 +614,13 @@ public class JikkenCommentStream : MonoBehaviour
 
         if (tutorialStep == 4 && tutorialTimer <= 0f)
         {
-            ShowPopup("コメントの赤文字をクリックしてみて", popupTextColor);
+            ShowPopup("コメントの赤文字をクリックしてみて右クリで閉じれるよ", popupTextColor);
             tutorialTimer = tutorialMessageInterval;
             if (!tutorialTaskCommentCreated)
             {
                 GameObject instruction = CreateTextObject("Tutorial Instruction", commentContent,
-                    "コメントの赤文字をクリックしてみて", fontSize, normalTextColor);
+                    "コメントの赤文字をクリックしてみて右クリで閉じれるよ",
+                    fontSize, normalTextColor);
                 RectTransform instructionRect = instruction.GetComponent<RectTransform>();
                 ConfigureListItem(instructionRect);
                 instruction.GetComponent<TextMeshProUGUI>().raycastTarget = false;
@@ -589,13 +636,19 @@ public class JikkenCommentStream : MonoBehaviour
         if (commentContent == null || taskComments == null || taskComments.Length == 0)
             return;
 
+        CreateSelectableTaskComment(message,
+            rect => AcceptTask(rect, 0, destination, isTutorialTask));
+    }
+
+    private void CreateSelectableTaskComment(string message, Action<RectTransform> onSelected)
+    {
         GameObject comment = CreateTextObject("Tutorial Task Comment", commentContent,
             message, fontSize, taskTextColor);
         RectTransform rect = comment.GetComponent<RectTransform>();
         ConfigureListItem(rect);
         Button button = comment.AddComponent<Button>();
         button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
-        button.onClick.AddListener(() => AcceptTask(rect, 0, destination, isTutorialTask));
+        button.onClick.AddListener(() => onSelected(rect));
         comments.Insert(0, rect);
         ArrangeComments();
         ShowPopup(message, taskTextColor);
@@ -625,24 +678,10 @@ public class JikkenCommentStream : MonoBehaviour
     private void AcceptTask(RectTransform sourceComment, int taskIndex, Vector2 destination,
         bool isTutorialTask = false)
     {
-        if (taskIndex < 0 || taskIndex >= taskComments.Length)
+        if (taskIndex < 0 || taskIndex >= taskComments.Length || HasActiveTask())
             return;
 
-        // 選択済みコメントも履歴としてコメント欄に残す。
-        if (sourceComment != null)
-        {
-            Button sourceButton = sourceComment.GetComponent<Button>();
-            if (sourceButton != null)
-                sourceButton.interactable = false;
-            TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
-            if (sourceLabel != null)
-            {
-                sourceLabel.raycastTarget = false;
-                sourceLabel.color = Color.yellow;
-                sourceLabel.fontStyle = FontStyles.Bold;
-            }
-        }
-        ArrangeComments();
+        MarkTaskCommentSelected(sourceComment);
 
         string taskDisplayText =
             $"タスク：指定地点へ移動\nX:{destination.x:F1}、Y:{destination.y:F1} のところへ進め";
@@ -650,7 +689,10 @@ public class JikkenCommentStream : MonoBehaviour
         {
             destination = destination,
             displayText = taskDisplayText,
-            isTutorialTask = isTutorialTask
+            isTutorialTask = isTutorialTask,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.Destination
         };
 
         if (roadMap == null)
@@ -675,10 +717,14 @@ public class JikkenCommentStream : MonoBehaviour
 
         selectedTask = task;
 
-        if (roadMap != null)
+        if (roadMap != null && task.completionType == TaskCompletionType.Destination)
         {
             roadMap.SetTaskDestination(task.destination, task.displayText);
             CreateTaskArrivalTrigger(roadMap.TaskDestination);
+        }
+        else
+        {
+            roadMap?.SetActiveTaskText(task.displayText);
         }
     }
 
@@ -698,21 +744,460 @@ public class JikkenCommentStream : MonoBehaviour
         triggerCollider.radius = taskArrivalDistance;
         TaskDestinationTrigger trigger = taskArrivalTriggerObject.AddComponent<TaskDestinationTrigger>();
         trigger.Configure(this);
+
+        GameObject markerObject = new GameObject("Task Destination Marker");
+        markerObject.transform.SetParent(taskArrivalTriggerObject.transform, false);
+        markerObject.layer = taskArrivalTriggerObject.layer;
+        SpriteRenderer markerRenderer = markerObject.AddComponent<SpriteRenderer>();
+        markerRenderer.sprite = GetTaskDestinationMarkerSprite();
+        markerRenderer.color = new Color(1f, 0.85f, 0.15f, 0.9f);
+        markerRenderer.sortingLayerName = "New Layer 2";
+        markerRenderer.sortingOrder = 1100;
+        markerObject.transform.localScale = Vector3.one * 0.8f;
+    }
+
+    private void MarkTaskCommentSelected(RectTransform sourceComment)
+    {
+        if (sourceComment != null)
+        {
+            Button sourceButton = sourceComment.GetComponent<Button>();
+            if (sourceButton != null)
+                sourceButton.interactable = false;
+            TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
+            if (sourceLabel != null)
+            {
+                sourceLabel.raycastTarget = false;
+                sourceLabel.color = Color.yellow;
+                sourceLabel.fontStyle = FontStyles.Bold;
+            }
+        }
+        ArrangeComments();
+    }
+
+    private static void MarkTaskCommentCompleted(RectTransform sourceComment)
+    {
+        if (sourceComment == null)
+            return;
+
+        TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
+        if (sourceLabel != null)
+        {
+            sourceLabel.color = new Color(0.35f, 1f, 0.45f, 1f);
+            sourceLabel.fontStyle = FontStyles.Bold;
+            sourceLabel.raycastTarget = false;
+        }
+    }
+
+    private bool HasActiveTask()
+    {
+        return selectedTask != null;
+    }
+
+    private void OnDestroy()
+    {
+        if (drinkItemController != null)
+            drinkItemController.DrinkPurchased -= CompleteVendingTask;
+        BushHideSpot2D.PlayerEnteredBush -= CompleteBushTask;
+        if (coffeeCupInteraction != null)
+            coffeeCupInteraction.LightActivated -= CompleteCoffeeCupTask;
+        if (castleInteraction != null)
+            castleInteraction.LightActivated -= CompleteCastleTask;
+    }
+
+    private static Sprite GetTaskDestinationMarkerSprite()
+    {
+        if (taskDestinationMarkerSprite == null)
+        {
+            taskDestinationMarkerSprite = Sprite.Create(Texture2D.whiteTexture,
+                new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            taskDestinationMarkerSprite.name = "Runtime Task Destination Marker";
+        }
+        return taskDestinationMarkerSprite;
     }
 
     public void NotifyTaskDestinationReached()
     {
-        if (selectedTask == null || roadMap == null || player == null || playerMovement == null)
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.Destination)
             return;
 
-        playerMovement.CompleteTask();
-        roadMap.ClearTaskDestination();
+        CompleteActiveTask();
+    }
+
+    private RectTransform CreateTaskView(string message)
+    {
+        if (taskContent == null)
+            return null;
+
+        GameObject task = CreateTextObject("Active Task", taskContent, message,
+            fontSize, normalTextColor);
+        RectTransform rect = task.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+        task.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        return rect;
+    }
+
+    private void SubscribeToWorldTasks()
+    {
+        drinkItemController = FindFirstObjectByType<DrinkItemController>();
+        if (drinkItemController != null)
+            drinkItemController.DrinkPurchased += CompleteVendingTask;
+        BushHideSpot2D.PlayerEnteredBush += CompleteBushTask;
+        coffeeCupInteraction = CoffeeCupLightInteraction.FindOrCreateInScene(
+            "コーヒーカップ", 4f, 6f, 3f, false);
+        if (coffeeCupInteraction != null)
+            coffeeCupInteraction.LightActivated += CompleteCoffeeCupTask;
+        castleInteraction = CoffeeCupLightInteraction.FindOrCreateInScene(
+            "城", 4f, 7f, 6f, true);
+        if (castleInteraction != null)
+            castleInteraction.LightActivated += CompleteCastleTask;
+        ApplyEnemyActivationStage(SubjiEnemyChase.SpawnTiming.GameStart);
+    }
+
+    private void StartPostTutorialTasks()
+    {
+        postTutorialTasksStarted = true;
+        const string message = "警備員から逃げながらタスクをこなして登録者を増やそう";
+        AddTutorialHistoryComment(message, normalTextColor);
+        ShowPopup(message, popupTextColor);
+        postTutorialSequenceStep = 1;
+        postTutorialSequenceTimer = id5To6Delay;
+    }
+
+    private void UpdatePostTutorialSequence()
+    {
+        if (!postTutorialTasksStarted || postTutorialSequenceStep <= 0 ||
+            postTutorialSequenceStep >= 3)
+            return;
+
+        postTutorialSequenceTimer -= Time.deltaTime;
+        if (postTutorialSequenceTimer > 0f)
+            return;
+
+        if (postTutorialSequenceStep == 1)
+        {
+            const string message = "自販機でドリンクを購入しよう";
+            CreateSelectableTaskComment(message,
+                rect => AcceptWorldTask(rect, true, message));
+            postTutorialSequenceStep = 2;
+            postTutorialSequenceTimer = id6To7Delay;
+            return;
+        }
+
+        const string bushMessage = "ブッシュの中に隠れよう";
+        CreateSelectableTaskComment(bushMessage,
+            rect => AcceptWorldTask(rect, false, bushMessage));
+        postTutorialSequenceStep = 3;
+    }
+
+    private void AcceptWorldTask(RectTransform sourceComment, bool isVendingTask,
+        string message)
+    {
+        if (HasActiveTask())
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        if (roadMap == null)
+            roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        TaskCompletionType completionType = isVendingTask
+            ? TaskCompletionType.VendingPurchase
+            : TaskCompletionType.BushHide;
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = completionType
+        });
+
+        activeWorldTaskGuidance = isVendingTask
+            ? "自販機の近くでEを押すと購入できるよ"
+            : "ブッシュの近くでEを押すと隠れられるよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+
+        if (isVendingTask)
+            roadMap?.SetActiveTaskTargets(drinkItemController?.GetVendingMachineTransforms());
+        else
+            roadMap?.SetActiveTaskTargets(FindObjectsByType<BushHideSpot2D>(
+                FindObjectsSortMode.None).Select(bush => bush.transform));
+    }
+
+    private void UpdateWorldTaskGuidance()
+    {
+        if (selectedTask == null || string.IsNullOrEmpty(activeWorldTaskGuidance))
+            return;
+
+        worldTaskGuidanceTimer -= Time.deltaTime;
+        if (worldTaskGuidanceTimer > 0f)
+            return;
+
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+    }
+
+    private void CompleteVendingTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.VendingPurchase)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteBushTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.BushHide)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteCoffeeCupTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.CoffeeCupLight)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteCastleTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.CastleLight)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void TryCreateCoffeeCupTask()
+    {
+        if (coffeeCupTaskCreated || !vendingTutorialCompleted ||
+            !bushTutorialCompleted || coffeeCupInteraction == null)
+            return;
+
+        coffeeCupTaskCreated = true;
+        const string message = "コーヒーカップに電気を灯そう";
+        CreateSelectableTaskComment(message,
+            rect => AcceptCoffeeCupTask(rect, message));
+    }
+
+    private void AcceptCoffeeCupTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask() || coffeeCupInteraction == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.CoffeeCupLight,
+            subscriberReward = 500
+        });
+
+        activeWorldTaskGuidance = "コーヒーカップの近くでEを押すとつくよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+        coffeeCupInteraction.SetTaskActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { coffeeCupInteraction.transform });
+    }
+
+    private void TryCreateCastleTask()
+    {
+        if (castleTaskCreated || castleInteraction == null)
+            return;
+
+        castleTaskCreated = true;
+        const string message = "城の電気を灯そう";
+        CreateSelectableTaskComment(message,
+            rect => AcceptCastleTask(rect, message));
+    }
+
+    private void AcceptCastleTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask() || castleInteraction == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.CastleLight,
+            subscriberReward = 1000
+        });
+
+        activeWorldTaskGuidance = "城の近くでEで点灯するよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+        castleInteraction.SetTaskActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { castleInteraction.transform });
+    }
+
+    private void CompleteActiveTask()
+    {
+        if (selectedTask == null)
+            return;
+
+        AcceptedTask completedTask = selectedTask;
+        selectedTask = null;
+        activeWorldTaskGuidance = null;
+        worldTaskGuidanceTimer = 0f;
+        playerMovement?.CompleteTask(completedTask.subscriberReward);
+        MarkTaskCommentCompleted(completedTask.sourceComment);
+        if (completedTask.taskView != null)
+            Destroy(completedTask.taskView.gameObject);
+
+        if (completedTask.completionType == TaskCompletionType.Destination)
+            roadMap?.ClearTaskDestination();
+        else
+            roadMap?.ClearActiveTaskText();
+
+        if (completedTask.completionType == TaskCompletionType.VendingPurchase)
+        {
+            vendingTutorialCompleted = true;
+            const string message = "ドリンクを飲むと一定時間Shiftダッシュが強化されるよ";
+            AddTutorialHistoryComment(message, normalTextColor);
+            ShowPopup(message, popupTextColor, 4f);
+        }
+        else if (completedTask.completionType == TaskCompletionType.BushHide)
+        {
+            bushTutorialCompleted = true;
+            const string message = "ブッシュの中に隠れると敵の追跡から逃れられるよ";
+            AddTutorialHistoryComment(message, normalTextColor);
+            ShowPopup(message, popupTextColor, 4f);
+        }
+        else if (completedTask.completionType == TaskCompletionType.CoffeeCupLight)
+        {
+            coffeeCupInteraction?.SetTaskActive(false);
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTask12);
+            TryCreateCastleTask();
+        }
+        else if (completedTask.completionType == TaskCompletionType.CastleLight)
+        {
+            castleInteraction?.SetTaskActive(false);
+        }
+
+        TrySpawnGreenGuard();
+        TryCreateCoffeeCupTask();
+
         if (taskArrivalTriggerObject != null)
         {
             Destroy(taskArrivalTriggerObject);
             taskArrivalTriggerObject = null;
         }
-        selectedTask = null;
+
+        if (playIntroTutorial && completedTask.isTutorialTask &&
+            !postTutorialTasksStarted)
+            StartPostTutorialTasks();
+    }
+
+    private void TrySpawnGreenGuard()
+    {
+        if (greenGuardSpawned || !vendingTutorialCompleted ||
+            !bushTutorialCompleted)
+            return;
+
+        if (player == null)
+        {
+            playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+            if (playerMovement != null)
+                player = playerMovement.transform;
+        }
+        if (player == null)
+            return;
+
+        if (greenGuardContainer != null)
+        {
+            foreach (SubjiEnemyChase sceneEnemy in
+                greenGuardContainer.GetComponentsInChildren<SubjiEnemyChase>(true))
+            {
+                sceneEnemy.player = player;
+                sceneEnemy.roadMap = roadMap != null
+                    ? roadMap
+                    : FindFirstObjectByType<SubjiRoadMap>();
+                sceneEnemy.ApplyAppearanceAndCollider();
+            }
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTasks6And7);
+        }
+        else
+        {
+            GameObject guard = new GameObject("Green Guard Post (-10, -3)");
+            guard.transform.position = new Vector3(-10f, -3f, 0f);
+            SubjiEnemyChase enemy = guard.AddComponent<SubjiEnemyChase>();
+            enemy.spriteResourcePath = "guard_green_enemy";
+            enemy.movementType = SubjiEnemyChase.MovementType.GuardPost;
+            enemy.matchPlayerMoveSpeed = true;
+            enemy.returnSpeed = 1f;
+            enemy.guardLookInterval = 1.5f;
+            enemy.useRadialDetection = false;
+            enemy.player = player;
+            enemy.roadMap = roadMap != null
+                ? roadMap
+                : FindFirstObjectByType<SubjiRoadMap>();
+            enemy.ApplyAppearanceAndCollider();
+        }
+        greenGuardSpawned = true;
+    }
+
+    private void ApplyEnemyActivationStage(
+        SubjiEnemyChase.SpawnTiming reachedStage)
+    {
+        if (greenGuardContainer == null)
+            return;
+
+        greenGuardContainer.SetActive(true);
+        if (reachedStage == SubjiEnemyChase.SpawnTiming.AfterTask12)
+            EnsureAfterTask12EnemyExists();
+        foreach (SubjiEnemyChase enemy in FindObjectsByType<SubjiEnemyChase>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            enemy.gameObject.SetActive(enemy.spawnTiming <= reachedStage);
+        }
+    }
+
+    private void EnsureAfterTask12EnemyExists()
+    {
+        foreach (SubjiEnemyChase existingEnemy in
+            greenGuardContainer.GetComponentsInChildren<SubjiEnemyChase>(true))
+        {
+            if (existingEnemy.spawnTiming == SubjiEnemyChase.SpawnTiming.AfterTask12)
+                return;
+        }
+
+        SubjiEnemyChase source =
+            greenGuardContainer.GetComponentInChildren<SubjiEnemyChase>(true);
+        GameObject guard = new GameObject("Green Guard Post (After ID12 Runtime)");
+        guard.transform.SetParent(greenGuardContainer.transform, false);
+        guard.transform.position = source != null
+            ? source.transform.position + Vector3.right * 3f
+            : new Vector3(-7f, -3f, 0f);
+        SubjiEnemyChase enemy = guard.AddComponent<SubjiEnemyChase>();
+        enemy.spriteResourcePath = source != null
+            ? source.spriteResourcePath
+            : "guard_green_enemy";
+        enemy.movementType = SubjiEnemyChase.MovementType.GuardPost;
+        enemy.spawnTiming = SubjiEnemyChase.SpawnTiming.AfterTask12;
+        enemy.matchPlayerMoveSpeed = true;
+        enemy.returnSpeed = source != null ? source.returnSpeed : 1f;
+        enemy.guardLookInterval = source != null ? source.guardLookInterval : 1.5f;
+        enemy.useRadialDetection = false;
+        enemy.player = player;
+        enemy.roadMap = roadMap;
+        enemy.ApplyAppearanceAndCollider();
     }
 
     private GameObject CreateTextObject(string objectName, Transform parent,

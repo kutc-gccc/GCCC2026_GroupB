@@ -63,9 +63,9 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Tooltip("左から数えたライトのスロット番号")]
     [Min(1)] public int lightSlotNumber = 2;
     [Tooltip("敵の正面視野と同じ、ライトの照射角度")]
-    [Range(1f, 180f)] public float lightViewAngle = 30f;
+    [Range(1f, 180f)] public float lightViewAngle = 45f;
     [Tooltip("敵の正面視野と同じ、ライトの照射距離")]
-    [Min(0.1f)] public float lightViewDistance = 6.5f;
+    [Min(0.1f)] public float lightViewDistance = 7.5f;
 
     [Header("敵の初期設定")]
     [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
@@ -160,6 +160,8 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void Awake()
     {
+        lightViewAngle = 45f;
+        lightViewDistance = 7.5f;
         rb = GetComponent<Rigidbody2D>();
         playerRenderer = GetComponent<SpriteRenderer>();
         if (rb != null)

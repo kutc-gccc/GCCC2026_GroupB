@@ -26,6 +26,8 @@ public class SubjiRoadMap : MonoBehaviour
     public Color roadColor = new Color(0.18f, 0.2f, 0.23f, 1f);
 
     [Header("ミニマップの設定")]
+    [Tooltip("ミニマップ機能を有効にします。現在は負荷確認のため停止しています")]
+    public bool showMinimap;
     [Range(100f, 400f)] public float minimapSize = 180f;
     [Range(0f, 50f)] public float minimapMargin = 16f;
     public Color minimapPlayerColor = new Color(0.15f, 0.9f, 1f, 1f);
@@ -46,16 +48,12 @@ public class SubjiRoadMap : MonoBehaviour
     private Transform player;
     private Vector2 center;
     private GUIStyle minimapLabelStyle;
+    private GUIStyle activeTaskStyle;
     private Vector2 taskDestination;
     private bool hasTaskDestination;
-    private SpriteRenderer[] stageMapSprites;
-    private Camera minimapCamera;
-    private RenderTexture minimapTexture;
+    private string activeTaskText;
     private GameObject stageMapRoot;
     private SubjiMovementArea2D movementArea;
-    private const int MinimapStageLayer = 8;
-    private float nextMinimapRenderTime;
-    private const float MinimapRenderInterval = 0.25f;
 
     public Vector2 Center => center;
 
@@ -108,14 +106,8 @@ public class SubjiRoadMap : MonoBehaviour
 
     private void Update()
     {
-        if (!Application.isPlaying)
+        if (!Application.isPlaying || !showMinimap)
             return;
-
-        if (minimapCamera != null && Time.unscaledTime >= nextMinimapRenderTime)
-        {
-            nextMinimapRenderTime = Time.unscaledTime + MinimapRenderInterval;
-            minimapCamera.Render();
-        }
 
         if (!enableDebugToggleKey || Keyboard.current == null)
             return;
@@ -133,9 +125,6 @@ public class SubjiRoadMap : MonoBehaviour
     private void RefreshStageMapSprites()
     {
         stageMapRoot = GameObject.Find("Stage Map (from stagen)");
-        stageMapSprites = stageMapRoot != null
-            ? stageMapRoot.GetComponentsInChildren<SpriteRenderer>(true)
-            : new SpriteRenderer[0];
 
         if (!restrictMovementToRoads)
             RefreshStageBounds();
@@ -175,64 +164,19 @@ public class SubjiRoadMap : MonoBehaviour
 
         center = stageBounds.center;
         fieldSize = Mathf.Max(stageBounds.size.x, stageBounds.size.y) + 2f;
-        UpdateMinimapCamera();
     }
 
-    private void EnsureMinimapCamera()
-    {
-        if (minimapCamera != null && minimapTexture != null)
-            return;
-
-        // ミニマップ用カメラには地形と建物だけを映す。
-        gameObject.layer = MinimapStageLayer;
-        if (stageMapRoot != null)
-            SetLayerRecursively(stageMapRoot, MinimapStageLayer);
-
-        GameObject cameraObject = new GameObject("Runtime Stage Minimap Camera");
-        cameraObject.transform.SetParent(transform, false);
-        minimapCamera = cameraObject.AddComponent<Camera>();
-        minimapCamera.orthographic = true;
-        minimapCamera.clearFlags = CameraClearFlags.SolidColor;
-        minimapCamera.backgroundColor = new Color(0.04f, 0.06f, 0.08f, 1f);
-        minimapCamera.cullingMask = 1 << MinimapStageLayer;
-        minimapCamera.depth = -100f;
-        minimapCamera.enabled = false;
-
-        minimapTexture = new RenderTexture(256, 256, 16, RenderTextureFormat.ARGB32);
-        minimapTexture.name = "Runtime Stage Minimap";
-        minimapTexture.filterMode = FilterMode.Bilinear;
-        minimapCamera.targetTexture = minimapTexture;
-        UpdateMinimapCamera();
-        minimapCamera.Render();
-        nextMinimapRenderTime = Time.unscaledTime + MinimapRenderInterval;
-    }
-
-    private static void SetLayerRecursively(GameObject target, int layer)
-    {
-        target.layer = layer;
-        foreach (Transform child in target.transform)
-            SetLayerRecursively(child.gameObject, layer);
-    }
-
-    private void UpdateMinimapCamera()
-    {
-        if (minimapCamera == null)
-            return;
-
-        minimapCamera.transform.position = new Vector3(center.x, center.y, -100f);
-        minimapCamera.transform.rotation = Quaternion.identity;
-        minimapCamera.orthographicSize = Mathf.Max(1f, fieldSize * 0.5f);
-    }
-
-    public void SetTaskDestination(Vector2 destination)
+    public void SetTaskDestination(Vector2 destination, string taskText = null)
     {
         taskDestination = GetClosestPointOnRoad(destination, Vector2.zero);
         hasTaskDestination = true;
+        activeTaskText = taskText;
     }
 
     public void ClearTaskDestination()
     {
         hasTaskDestination = false;
+        activeTaskText = null;
     }
 
     public void Configure(Transform target, Vector2 mapCenter, float size)
@@ -644,18 +588,14 @@ public class SubjiRoadMap : MonoBehaviour
         float mapSize = Mathf.Min(minimapSize, Screen.width * 0.35f, Screen.height * 0.35f);
         Rect map = new Rect(Screen.width - mapSize - minimapMargin, minimapMargin, mapSize, mapSize);
 
-        GUI.color = new Color(0.04f, 0.06f, 0.08f, 0.88f);
-        GUI.Box(map, GUIContent.none);
-
-        if (!restrictMovementToRoads)
+        if (!showMinimap)
         {
-            EnsureMinimapCamera();
-            if (minimapTexture != null)
-            {
-                GUI.color = Color.white;
-                GUI.DrawTexture(map, minimapTexture, ScaleMode.StretchToFill, false);
-            }
+            DrawActiveTaskInMinimapArea(map);
+            return;
         }
+
+        GUI.color = new Color(0.58f, 0.64f, 0.54f, 1f);
+        GUI.DrawTexture(map, Texture2D.whiteTexture);
 
         GUI.BeginGroup(map);
         float scale = mapSize / fieldSize;
@@ -702,50 +642,50 @@ public class SubjiRoadMap : MonoBehaviour
             minimapLabelStyle.normal.textColor = Color.white;
         }
         GUI.Label(new Rect(map.x, map.y + map.height + 2f, map.width, 22f), "MINI MAP", minimapLabelStyle);
-    }
 
-    private void DrawStageMapOnMinimap(float mapSize, float scale)
-    {
-        if (stageMapSprites == null || stageMapSprites.Length == 0)
-            RefreshStageMapSprites();
-
-        foreach (SpriteRenderer spriteRenderer in stageMapSprites)
+        if (!string.IsNullOrWhiteSpace(activeTaskText))
         {
-            if (spriteRenderer == null || !spriteRenderer.enabled ||
-                !spriteRenderer.gameObject.activeInHierarchy || spriteRenderer.sprite == null)
-                continue;
+            if (activeTaskStyle == null)
+            {
+                activeTaskStyle = new GUIStyle(GUI.skin.label);
+                activeTaskStyle.alignment = TextAnchor.UpperLeft;
+                activeTaskStyle.fontStyle = FontStyle.Bold;
+                activeTaskStyle.normal.textColor = new Color(1f, 0.9f, 0.25f, 1f);
+                activeTaskStyle.wordWrap = true;
+                activeTaskStyle.padding = new RectOffset(10, 10, 8, 8);
+            }
 
-            Bounds bounds = spriteRenderer.bounds;
-            float x = (bounds.min.x - center.x + fieldSize * 0.5f) * scale;
-            float y = mapSize - ((bounds.max.y - center.y + fieldSize * 0.5f) * scale);
-            float width = Mathf.Max(2f, bounds.size.x * scale);
-            float height = Mathf.Max(2f, bounds.size.y * scale);
-            GUI.color = spriteRenderer.color;
-            GUI.DrawTexture(new Rect(x, y, width, height), spriteRenderer.sprite.texture,
-                ScaleMode.ScaleToFit, true);
+            float taskTop = map.y + map.height + 26f;
+            float taskHeight = Mathf.Max(54f, activeTaskStyle.CalcHeight(
+                new GUIContent(activeTaskText), map.width));
+            Rect taskRect = new Rect(map.x, taskTop, map.width, taskHeight);
+            GUI.color = new Color(0.02f, 0.12f, 0.22f, 0.96f);
+            GUI.DrawTexture(taskRect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(taskRect, activeTaskText, activeTaskStyle);
         }
     }
 
-    private void OnDestroy()
+    private void DrawActiveTaskInMinimapArea(Rect area)
     {
-        if (minimapTexture != null)
+        if (string.IsNullOrWhiteSpace(activeTaskText))
+            return;
+
+        if (activeTaskStyle == null)
         {
-            minimapTexture.Release();
-            Destroy(minimapTexture);
+            activeTaskStyle = new GUIStyle(GUI.skin.label);
+            activeTaskStyle.alignment = TextAnchor.UpperLeft;
+            activeTaskStyle.fontStyle = FontStyle.Normal;
+            activeTaskStyle.fontSize = 14;
+            activeTaskStyle.normal.textColor = new Color(0.82f, 0.84f, 0.86f, 0.78f);
+            activeTaskStyle.wordWrap = true;
+            activeTaskStyle.clipping = TextClipping.Clip;
+            activeTaskStyle.padding = new RectOffset(4, 4, 2, 2);
         }
+
+        GUI.color = Color.white;
+        Rect threeLineArea = new Rect(area.x, area.y, area.width, 60f);
+        GUI.Label(threeLineArea, activeTaskText, activeTaskStyle);
     }
 
-    private static void DrawMinimapCircle(Vector2 centerPoint, float radius)
-    {
-        const int segments = 48;
-        const float pointSize = 2f;
-        for (int i = 0; i < segments; i++)
-        {
-            float angle = i * Mathf.PI * 2f / segments;
-            float x = centerPoint.x + Mathf.Cos(angle) * radius;
-            float y = centerPoint.y + Mathf.Sin(angle) * radius;
-            GUI.DrawTexture(new Rect(x - pointSize * 0.5f, y - pointSize * 0.5f,
-                pointSize, pointSize), Texture2D.whiteTexture);
-        }
-    }
 }

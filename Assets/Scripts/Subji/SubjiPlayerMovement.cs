@@ -87,9 +87,12 @@ public class SubjiPlayerMovement : MonoBehaviour
     private Vector2 movement;
     private InputAction moveAction;
     private GUIStyle coordinateStyle;
+    private GUIStyle taskCompleteStyle;
     private Vector2 fieldCenter;
     private SubjiRoadMap roadMap;
     private float subscriberGrowthTimer;
+    private float taskCompleteMessageUntil;
+    private int lastTaskSubscriberReward;
     private Transform speedBoostGaugeRoot;
     private Transform speedBoostGaugeFill;
     private float speedBoostAmount = 1f;
@@ -209,6 +212,8 @@ public class SubjiPlayerMovement : MonoBehaviour
     public void CompleteTask()
     {
         AddSubscribers(subscribersPerCompletedTask);
+        lastTaskSubscriberReward = subscribersPerCompletedTask;
+        taskCompleteMessageUntil = Time.unscaledTime + 1.3f;
     }
 
     private void AddSubscribers(int amount)
@@ -668,5 +673,25 @@ public class SubjiPlayerMovement : MonoBehaviour
         GUI.Box(new Rect(10f, 126f, 275f, 48f), GUIContent.none);
         GUI.color = Color.white;
         GUI.Label(new Rect(20f, 133f, 255f, 34f), coordinates, coordinateStyle);
+
+        if (Time.unscaledTime < taskCompleteMessageUntil)
+        {
+            if (taskCompleteStyle == null)
+            {
+                taskCompleteStyle = new GUIStyle(GUI.skin.label);
+                taskCompleteStyle.fontSize = 38;
+                taskCompleteStyle.fontStyle = FontStyle.Bold;
+                taskCompleteStyle.alignment = TextAnchor.MiddleCenter;
+                taskCompleteStyle.normal.textColor = new Color(1f, 0.9f, 0.2f, 1f);
+            }
+
+            const float width = 520f;
+            const float height = 90f;
+            Rect messageRect = new Rect((Screen.width - width) * 0.5f,
+                (Screen.height - height) * 0.5f, width, height);
+            GUI.color = Color.white;
+            GUI.Label(messageRect,
+                $"タスク完了  +{lastTaskSubscriberReward}人", taskCompleteStyle);
+        }
     }
 }

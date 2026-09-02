@@ -23,9 +23,9 @@ public class JikkenCommentStream : MonoBehaviour
 
     private class AcceptedTask
     {
-        public RectTransform rect;
-        public TextMeshProUGUI label;
         public Vector2 destination;
+        public string displayText;
+        public bool isTutorialTask;
     }
 
     [Header("通常コメント")]
@@ -45,6 +45,11 @@ public class JikkenCommentStream : MonoBehaviour
     [Header("タスク目的地")]
     [Tooltip("目的地へこの距離まで近づくとタスク完了になります")]
     [Min(0.1f)] public float taskArrivalDistance = 1f;
+
+    [Header("導入チュートリアル")]
+    [Tooltip("コメント表のID 1～4をゲーム開始時に順番に再生します")]
+    public bool playIntroTutorial = true;
+    [Min(0.5f)] public float tutorialMessageInterval = 4f;
 
     [Header("表示設定")]
     public TMP_FontAsset fontAsset;
@@ -79,7 +84,6 @@ public class JikkenCommentStream : MonoBehaviour
     [Min(0.0001f)] public float editorPreviewScale = 0.01f;
 
     private readonly List<RectTransform> comments = new List<RectTransform>();
-    private readonly List<AcceptedTask> acceptedTasks = new List<AcceptedTask>();
     private GameObject uiRoot;
     private GameObject popupRoot;
     private TextMeshProUGUI popupLabel;
@@ -92,6 +96,11 @@ public class JikkenCommentStream : MonoBehaviour
     private Transform player;
     private SubjiPlayerMovement playerMovement;
     private AcceptedTask selectedTask;
+    private int tutorialStep;
+    private float tutorialTimer;
+    private bool tutorialTaskCommentCreated;
+    private bool tutorialStep3CommentCreated;
+    private GameObject taskArrivalTriggerObject;
 
     private void Awake()
     {
@@ -104,6 +113,8 @@ public class JikkenCommentStream : MonoBehaviour
         {
             uiRoot.SetActive(false);
             CreatePopupUi();
+            if (playIntroTutorial)
+                BeginIntroTutorial();
         }
     }
 
@@ -138,7 +149,7 @@ public class JikkenCommentStream : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
-        UpdateActiveTask();
+        UpdateIntroTutorial();
 
         if (isOpen && Mouse.current != null &&
             Mouse.current.rightButton.wasPressedThisFrame)
@@ -504,6 +515,106 @@ public class JikkenCommentStream : MonoBehaviour
             RemoveCommentAt(comments.Count - 1);
     }
 
+    private void BeginIntroTutorial()
+    {
+        tutorialStep = 1;
+        tutorialTimer = 4f;
+        AddTutorialHistoryComment("wasdでキャラを動かしてみよう", normalTextColor);
+        ShowPopup("wasdでキャラを動かしてみよう", normalTextColor);
+        popupTimer = tutorialTimer;
+    }
+
+    private void UpdateIntroTutorial()
+    {
+        if (!playIntroTutorial || tutorialStep <= 0 || tutorialStep >= 5)
+            return;
+
+        tutorialTimer -= Time.deltaTime;
+        if (tutorialStep == 1 && tutorialTimer <= 0f)
+        {
+            tutorialStep = 2;
+            CreateTutorialTaskComment(new Vector2(0f, 20f),
+                "◆ (0,20)の地点に行ってみよう", true);
+            // タスクはまだ開始せず、先に選択方法を案内する。
+            tutorialStep = 3;
+            tutorialTimer = 2f;
+            return;
+        }
+
+        if (tutorialStep == 3)
+        {
+            if (!tutorialStep3CommentCreated)
+            {
+                AddTutorialHistoryComment(
+                    "マウススクロールしてコメント左クリックでタスクを確認しよう",
+                    normalTextColor);
+                tutorialStep3CommentCreated = true;
+            }
+
+            if (isOpen)
+            {
+                tutorialStep = 4;
+                tutorialTimer = 0f;
+                tutorialTaskCommentCreated = false;
+            }
+            else if (tutorialTimer <= 0f)
+            {
+                ShowPopup("マウススクロールしてコメント左クリックでタスクを確認しよう",
+                    popupTextColor);
+                tutorialTimer = tutorialMessageInterval;
+            }
+            return;
+        }
+
+        if (tutorialStep == 4 && tutorialTimer <= 0f)
+        {
+            ShowPopup("コメントの赤文字をクリックしてみて", popupTextColor);
+            tutorialTimer = tutorialMessageInterval;
+            if (!tutorialTaskCommentCreated)
+            {
+                GameObject instruction = CreateTextObject("Tutorial Instruction", commentContent,
+                    "コメントの赤文字をクリックしてみて", fontSize, normalTextColor);
+                RectTransform instructionRect = instruction.GetComponent<RectTransform>();
+                ConfigureListItem(instructionRect);
+                instruction.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+                comments.Insert(0, instructionRect);
+                tutorialTaskCommentCreated = true;
+                ArrangeComments();
+            }
+        }
+    }
+
+    private void CreateTutorialTaskComment(Vector2 destination, string message, bool isTutorialTask)
+    {
+        if (commentContent == null || taskComments == null || taskComments.Length == 0)
+            return;
+
+        GameObject comment = CreateTextObject("Tutorial Task Comment", commentContent,
+            message, fontSize, taskTextColor);
+        RectTransform rect = comment.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+        Button button = comment.AddComponent<Button>();
+        button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
+        button.onClick.AddListener(() => AcceptTask(rect, 0, destination, isTutorialTask));
+        comments.Insert(0, rect);
+        ArrangeComments();
+        ShowPopup(message, taskTextColor);
+    }
+
+    private void AddTutorialHistoryComment(string message, Color color)
+    {
+        if (commentContent == null || string.IsNullOrEmpty(message))
+            return;
+
+        GameObject comment = CreateTextObject("Tutorial Comment History", commentContent,
+            message, fontSize, color);
+        RectTransform rect = comment.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+        comment.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        comments.Insert(0, rect);
+        ArrangeComments();
+    }
+
     private string GetRandomNormalWord()
     {
         if (words == null || words.Length == 0)
@@ -511,99 +622,97 @@ public class JikkenCommentStream : MonoBehaviour
         return words[UnityEngine.Random.Range(0, words.Length)];
     }
 
-    private void AcceptTask(RectTransform sourceComment, int taskIndex, Vector2 destination)
+    private void AcceptTask(RectTransform sourceComment, int taskIndex, Vector2 destination,
+        bool isTutorialTask = false)
     {
         if (taskIndex < 0 || taskIndex >= taskComments.Length)
             return;
 
-        int sourceIndex = comments.IndexOf(sourceComment);
-        if (sourceIndex >= 0)
-            comments.RemoveAt(sourceIndex);
+        // 選択済みコメントも履歴としてコメント欄に残す。
         if (sourceComment != null)
-            Destroy(sourceComment.gameObject);
+        {
+            Button sourceButton = sourceComment.GetComponent<Button>();
+            if (sourceButton != null)
+                sourceButton.interactable = false;
+            TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
+            if (sourceLabel != null)
+            {
+                sourceLabel.raycastTarget = false;
+                sourceLabel.color = Color.yellow;
+                sourceLabel.fontStyle = FontStyles.Bold;
+            }
+        }
         ArrangeComments();
 
-        GameObject task = CreateTextObject("Accepted Task", taskContent,
-            $"タスク：指定地点へ移動\nX:{destination.x:F1}、Y:{destination.y:F1} のところへ進め",
-            fontSize, Color.white);
-        RectTransform taskRect = task.GetComponent<RectTransform>();
-        taskRect.anchorMin = new Vector2(0f, 1f);
-        taskRect.anchorMax = new Vector2(1f, 1f);
-        taskRect.pivot = new Vector2(0.5f, 1f);
-        taskRect.sizeDelta = new Vector2(0f, 110f);
-        TextMeshProUGUI label = task.GetComponent<TextMeshProUGUI>();
-        label.alignment = TextAlignmentOptions.TopLeft;
-        label.textWrappingMode = TextWrappingModes.Normal;
-
+        string taskDisplayText =
+            $"タスク：指定地点へ移動\nX:{destination.x:F1}、Y:{destination.y:F1} のところへ進め";
         AcceptedTask acceptedTask = new AcceptedTask
         {
-            rect = taskRect,
-            label = label,
-            destination = destination
+            destination = destination,
+            displayText = taskDisplayText,
+            isTutorialTask = isTutorialTask
         };
-        Button taskButton = task.AddComponent<Button>();
-        taskButton.targetGraphic = label;
-        taskButton.onClick.AddListener(() => SelectTask(acceptedTask));
-        acceptedTasks.Add(acceptedTask);
-        ArrangeAcceptedTasks();
 
         if (roadMap == null)
             roadMap = FindFirstObjectByType<SubjiRoadMap>();
         if (player == null)
         {
-            SubjiPlayerMovement playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+            playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
             if (playerMovement != null)
                 player = playerMovement.transform;
         }
 
+        // コメントをクリックした時点で受諾と選択を同時に行う。
+        SelectTask(acceptedTask);
+        if (tutorialStep == 4 && isTutorialTask)
+            tutorialStep = 5;
     }
 
     private void SelectTask(AcceptedTask task)
     {
-        if (task == null || task.rect == null)
+        if (task == null)
             return;
 
         selectedTask = task;
-        for (int i = 0; i < acceptedTasks.Count; i++)
-        {
-            bool isSelected = acceptedTasks[i] == selectedTask;
-            acceptedTasks[i].label.color = isSelected ? Color.yellow : Color.white;
-            acceptedTasks[i].label.fontStyle = isSelected ? FontStyles.Bold : FontStyles.Normal;
-        }
 
         if (roadMap != null)
-            roadMap.SetTaskDestination(task.destination);
-    }
-
-    private void ArrangeAcceptedTasks()
-    {
-        const float acceptedTaskHeight = 110f;
-        for (int i = acceptedTasks.Count - 1; i >= 0; i--)
         {
-            if (acceptedTasks[i].rect == null)
-            {
-                acceptedTasks.RemoveAt(i);
-                continue;
-            }
-            acceptedTasks[i].rect.anchoredPosition = new Vector2(0f, -(i * acceptedTaskHeight));
+            roadMap.SetTaskDestination(task.destination, task.displayText);
+            CreateTaskArrivalTrigger(roadMap.TaskDestination);
         }
     }
 
-    private void UpdateActiveTask()
+    private void CreateTaskArrivalTrigger(Vector2 destination)
     {
-        if (selectedTask == null || roadMap == null || player == null)
-            return;
+        if (taskArrivalTriggerObject != null)
+            Destroy(taskArrivalTriggerObject);
 
-        if (Vector2.Distance(player.position, selectedTask.destination) > taskArrivalDistance)
+        taskArrivalTriggerObject = new GameObject("Task Arrival Trigger");
+        taskArrivalTriggerObject.transform.position = destination;
+        int ignoreRaycastLayer = LayerMask.NameToLayer("Ignore Raycast");
+        if (ignoreRaycastLayer >= 0)
+            taskArrivalTriggerObject.layer = ignoreRaycastLayer;
+
+        CircleCollider2D triggerCollider = taskArrivalTriggerObject.AddComponent<CircleCollider2D>();
+        triggerCollider.isTrigger = true;
+        triggerCollider.radius = taskArrivalDistance;
+        TaskDestinationTrigger trigger = taskArrivalTriggerObject.AddComponent<TaskDestinationTrigger>();
+        trigger.Configure(this);
+    }
+
+    public void NotifyTaskDestinationReached()
+    {
+        if (selectedTask == null || roadMap == null || player == null || playerMovement == null)
             return;
 
         playerMovement.CompleteTask();
         roadMap.ClearTaskDestination();
-        acceptedTasks.Remove(selectedTask);
-        if (selectedTask.rect != null)
-            Destroy(selectedTask.rect.gameObject);
+        if (taskArrivalTriggerObject != null)
+        {
+            Destroy(taskArrivalTriggerObject);
+            taskArrivalTriggerObject = null;
+        }
         selectedTask = null;
-        ArrangeAcceptedTasks();
     }
 
     private GameObject CreateTextObject(string objectName, Transform parent,

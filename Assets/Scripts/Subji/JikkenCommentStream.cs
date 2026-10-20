@@ -935,7 +935,7 @@ public class JikkenCommentStream : MonoBehaviour
 
     private bool HasActiveTask()
     {
-        return selectedTask != null;
+        return selectedTask != null || (playerMovement != null && playerMovement.IsInInterior);
     }
 
     private void OnDestroy()

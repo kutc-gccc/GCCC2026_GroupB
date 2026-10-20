@@ -118,17 +118,51 @@ public class SubjiPlayerMovement : MonoBehaviour
     private int lastPlacedLightRevision = -1;
     private float staminaFreezeEndTime;
     private Color staminaFreezeGaugeColor;
+    private SubjiMovementArea2D interiorMovementArea;
+    private SubjiInteriorStage interiorStage;
+    private Collider2D movementCollider;
+    private const int OcclusionRayCount = 129;
+    private readonly float[] occlusionDistances = new float[OcclusionRayCount];
+    private readonly Vector4[] occlusionWallRects = new Vector4[64];
+    private readonly RaycastHit2D[] occlusionHits = new RaycastHit2D[16];
+    private float nextOcclusionUpdate;
+    private Vector2 lastOcclusionPosition;
+    private Vector2 lastOcclusionDirection;
+
+    public bool IsInInterior => interiorMovementArea != null;
+    public bool IsStandalonePreview { get; set; }
+
+    public void SetInteriorArea(SubjiMovementArea2D area)
+    {
+        interiorMovementArea = area;
+        interiorStage = area != null ? area.GetComponentInParent<SubjiInteriorStage>() : null;
+        nextOcclusionUpdate = 0f;
+        UpdateDarknessVisibility();
+        UpdateDarknessMaterial();
+    }
+
+    public void TeleportTo(Vector3 position)
+    {
+        movement = Vector2.zero;
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.position = position;
+        }
+        transform.position = position;
+        Physics2D.SyncTransforms();
+    }
 
     public bool IsMoving => movement.sqrMagnitude > 0.01f;
     public bool IsHidden { get; private set; }
 
     public bool IsWorldPositionIlluminated(Vector2 worldPosition)
     {
-        if (!enableNightVision)
+        if (!enableNightVision && !IsInInterior)
             return true;
 
         Vector2 fromPlayer = worldPosition - (Vector2)transform.position;
-        if (fromPlayer.sqrMagnitude <= playerVisionRadius * playerVisionRadius)
+        if (!IsInInterior && fromPlayer.sqrMagnitude <= playerVisionRadius * playerVisionRadius)
             return true;
 
         if (isLightOn && fromPlayer.sqrMagnitude <=
@@ -163,6 +197,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         lightViewAngle = 45f;
         lightViewDistance = 7.5f;
         rb = GetComponent<Rigidbody2D>();
+        movementCollider = GetComponent<Collider2D>();
         playerRenderer = GetComponent<SpriteRenderer>();
         if (rb != null)
         {
@@ -171,20 +206,26 @@ public class SubjiPlayerMovement : MonoBehaviour
             rb.freezeRotation = true;
         }
         roadMap = FindFirstObjectByType<SubjiRoadMap>();
-        if (roadMap == null || !roadMap.IsReady)
+        if (IsStandalonePreview)
+            SetInteriorArea(GetComponentInParent<SubjiInteriorStage>().movementArea);
+        if (!IsInInterior && (roadMap == null || !roadMap.IsReady))
         {
             Debug.LogError("Subji Road Map がシーンにありません。先にマップを配置してください。", this);
             enabled = false;
             return;
         }
 
-        fieldCenter = roadMap.Center;
-        roadMap.RegisterPlayer(transform);
-        transform.position = roadMap.GetClosestPointOnRoad(transform.position,
-            playerRenderer != null ? playerRenderer.bounds.extents : Vector2.zero);
-        CreateEnemy();
-        if (GetComponent<SubjiGameClearGoal>() == null)
-            gameObject.AddComponent<SubjiGameClearGoal>();
+        fieldCenter = transform.position;
+        if (!IsInInterior)
+        {
+            fieldCenter = roadMap.Center;
+            roadMap.RegisterPlayer(transform);
+            transform.position = roadMap.GetClosestPointOnRoad(transform.position,
+                playerRenderer != null ? playerRenderer.bounds.extents : Vector2.zero);
+            CreateEnemy();
+            if (GetComponent<SubjiGameClearGoal>() == null)
+                gameObject.AddComponent<SubjiGameClearGoal>();
+        }
         CreateSpeedBoostGauge();
         CreateDarknessOverlay();
 
@@ -222,7 +263,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         movement = IsHidden || interactionMovementLocked
             ? Vector2.zero
             : moveAction.ReadValue<Vector2>().normalized;
-        if (Keyboard.current != null &&
+        if (!IsInInterior && Keyboard.current != null &&
             Keyboard.current[nightVisionToggleKey].wasPressedThisFrame)
         {
             enableNightVision = !enableNightVision;
@@ -303,15 +344,27 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (darknessMaterial == null)
             return;
 
-        Color appliedDarknessColor = darknessColor;
-        appliedDarknessColor.a *= outsideDarkness;
+        // カメラに追従させ、別シーンのどこへ移動しても画面全体を覆う。
+        Camera viewCamera = Camera.main;
+        if (viewCamera != null && viewCamera.orthographic)
+        {
+            Vector3 center = viewCamera.transform.position;
+            darknessOverlay.transform.position = new Vector3(center.x, center.y, -0.1f);
+            float size = Mathf.Max(darknessOverlaySize,
+                viewCamera.orthographicSize * 2f * Mathf.Max(1f, viewCamera.aspect) + 4f);
+            darknessOverlay.transform.localScale = new Vector3(size, size, 1f);
+        }
+
+        Color appliedDarknessColor = IsInInterior ? Color.black : darknessColor;
+        appliedDarknessColor.a *= IsInInterior ? 1f : outsideDarkness;
         darknessMaterial.SetColor("_Color", appliedDarknessColor);
         darknessMaterial.SetVector("_PlayerData", new Vector4(transform.position.x,
-            transform.position.y, playerVisionRadius, visionGradientWidth));
+            transform.position.y, IsInInterior ? -1f : playerVisionRadius, visionGradientWidth));
         darknessMaterial.SetVector("_FlashlightData", new Vector4(isLightOn ? 1f : 0f,
             lightViewDistance, Mathf.Cos(lightViewAngle * 0.5f * Mathf.Deg2Rad), 0f));
         darknessMaterial.SetVector("_FlashlightDirection",
             new Vector4(flashlightDirection.x, flashlightDirection.y, 0f, 0f));
+        UpdateLightOcclusion();
 
         if (lastPlacedLightRevision == SubjiPlacedLight.Revision)
             return;
@@ -328,6 +381,62 @@ public class SubjiPlayerMovement : MonoBehaviour
         }
         darknessMaterial.SetInt("_PlacedLightCount", count);
         darknessMaterial.SetVectorArray("_PlacedLights", placedLightShaderData);
+    }
+
+    private void UpdateLightOcclusion()
+    {
+        bool occlude = interiorStage != null && isLightOn;
+        darknessMaterial.SetFloat("_OcclusionEnabled", occlude ? 1f : 0f);
+        if (!occlude)
+            return;
+        if (Time.unscaledTime < nextOcclusionUpdate &&
+            ((Vector2)transform.position - lastOcclusionPosition).sqrMagnitude < 0.000001f &&
+            (flashlightDirection - lastOcclusionDirection).sqrMagnitude < 0.000001f)
+            return;
+        lastOcclusionPosition = transform.position;
+        lastOcclusionDirection = flashlightDirection;
+        nextOcclusionUpdate = Time.unscaledTime + 1f / 30f;
+        float halfAngle = lightViewAngle * 0.5f * Mathf.Deg2Rad;
+        float step = halfAngle * 2f / (OcclusionRayCount - 1);
+        float facing = Mathf.Atan2(flashlightDirection.y, flashlightDirection.x);
+        ContactFilter2D filter = new() { useTriggers = false };
+        int wallCount = 0;
+        for (int i = 0; i < OcclusionRayCount; i++)
+        {
+            float angle = facing - halfAngle + step * i;
+            Vector2 direction = new(Mathf.Cos(angle), Mathf.Sin(angle));
+            float distance = lightViewDistance;
+            Vector4 wall = new(1f, 1f, -1f, -1f);
+            int count = Physics2D.Raycast(transform.position, direction, filter,
+                occlusionHits, lightViewDistance);
+            for (int h = 0; h < count; h++)
+            {
+                RaycastHit2D hit = occlusionHits[h];
+                if (hit.collider == movementCollider || hit.distance <= 0.001f ||
+                    hit.distance >= distance)
+                    continue;
+                distance = hit.distance;
+                wall = interiorStage.GetBlockingWallRect(hit.point, -hit.normal);
+            }
+            occlusionDistances[i] = distance;
+            if (wall.z >= wall.x && wallCount < occlusionWallRects.Length)
+            {
+                bool known = false;
+                for (int w = 0; w < wallCount; w++)
+                    if (occlusionWallRects[w] == wall)
+                    {
+                        known = true;
+                        break;
+                    }
+                if (!known)
+                    occlusionWallRects[wallCount++] = wall;
+            }
+        }
+        darknessMaterial.SetFloatArray("_OcclusionDistances", occlusionDistances);
+        darknessMaterial.SetInt("_VisibleWallCount", wallCount);
+        darknessMaterial.SetVectorArray("_VisibleWallRects", occlusionWallRects);
+        darknessMaterial.SetVector("_OcclusionAngles", new Vector4(halfAngle, step,
+            flashlightDirection.x, flashlightDirection.y));
     }
 
     Texture2D CreateDarknessTexture(int resolution, float overlaySize, float clearRadius,
@@ -439,11 +548,11 @@ public class SubjiPlayerMovement : MonoBehaviour
         if (Mouse.current == null)
             return;
 
-        if (itemSlotSelector == null)
+        if (!IsStandalonePreview && itemSlotSelector == null)
             itemSlotSelector = FindFirstObjectByType<ItemSlotSelector>();
 
-        bool lightSlotSelected = itemSlotSelector != null &&
-            itemSlotSelector.SelectedIndex == Mathf.Max(1, lightSlotNumber) - 1;
+        bool lightSlotSelected = IsStandalonePreview || (itemSlotSelector != null &&
+            itemSlotSelector.SelectedIndex == Mathf.Max(1, lightSlotNumber) - 1);
         if (lightSlotSelected && Mouse.current.leftButton.wasPressedThisFrame)
             SetLightOn(true);
         if (lightSlotSelected && Mouse.current.rightButton.wasPressedThisFrame)
@@ -467,7 +576,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     void UpdateDarknessVisibility()
     {
         if (darknessOverlay != null)
-            darknessOverlay.SetActive(enableNightVision);
+            darknessOverlay.SetActive(enableNightVision || IsInInterior);
     }
 
     void OnDestroy()
@@ -629,7 +738,13 @@ public class SubjiPlayerMovement : MonoBehaviour
         Vector2 nextPosition = rb.position
             + movement * currentMoveSpeed * Time.fixedDeltaTime;
 
-        if (roadMap != null)
+        if (interiorStage != null)
+            nextPosition = interiorStage.ConstrainMovement(rb.position, nextPosition,
+                movementCollider != null ? (Vector2)movementCollider.bounds.extents : playerExtents);
+        else if (IsInInterior)
+            nextPosition = SubjiRoadMap.ConstrainToArea(rb.position, nextPosition,
+                playerExtents, interiorMovementArea);
+        else if (roadMap != null)
             nextPosition = roadMap.ConstrainToRoad(rb.position, nextPosition, playerExtents);
 
         rb.MovePosition(nextPosition);

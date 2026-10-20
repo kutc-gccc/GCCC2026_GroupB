@@ -7,7 +7,7 @@ public sealed class SubjiMovementArea2D : MonoBehaviour
     public Vector2 pointB = new(50f, 45f);
     [SerializeField, HideInInspector] private bool isConfirmed;
 
-    public bool IsConfirmed => isConfirmed;
+    public bool IsConfirmed => isActiveAndEnabled && isConfirmed;
 
     public Bounds GetWorldBounds()
     {
@@ -24,6 +24,8 @@ public sealed class SubjiMovementArea2D : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        if (!enabled)
+            return;
         Bounds bounds = GetWorldBounds();
         Gizmos.color = isConfirmed ? new Color(0.2f, 1f, 0.35f, 0.85f) : new Color(1f, 0.75f, 0.1f, 0.85f);
         Gizmos.DrawWireCube(bounds.center, bounds.size);

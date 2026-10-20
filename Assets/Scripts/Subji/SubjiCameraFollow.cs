@@ -8,6 +8,14 @@ public class SubjiCameraFollow : MonoBehaviour
     [Range(0.01f, 1f)] public float smoothTime = 0.15f;
     private Vector3 followVelocity;
 
+    public void SnapToPlayer()
+    {
+        if (player == null)
+            return;
+        followVelocity = Vector3.zero;
+        transform.position = new Vector3(player.position.x, player.position.y, -10f);
+    }
+
     void LateUpdate()
     {
         if (player == null)

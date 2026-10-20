@@ -303,10 +303,16 @@ public class SubjiRoadMap : MonoBehaviour
     {
         if (movementArea == null)
             movementArea = FindFirstObjectByType<SubjiMovementArea2D>();
-        if (movementArea == null || !movementArea.IsConfirmed)
+        return ConstrainToArea(currentPosition, position, extents, movementArea);
+    }
+
+    public static Vector2 ConstrainToArea(Vector2 currentPosition, Vector2 position,
+        Vector2 extents, SubjiMovementArea2D area)
+    {
+        if (area == null || !area.IsConfirmed)
             return position;
 
-        Bounds bounds = movementArea.GetWorldBounds();
+        Bounds bounds = area.GetWorldBounds();
         position.x = Mathf.Clamp(position.x, bounds.min.x + extents.x, bounds.max.x - extents.x);
         position.y = Mathf.Clamp(position.y, bounds.min.y + extents.y, bounds.max.y - extents.y);
         if (!OverlapsInvisibleWall(position, extents))

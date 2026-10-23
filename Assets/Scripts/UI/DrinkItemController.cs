@@ -38,6 +38,7 @@ public sealed class DrinkItemController : MonoBehaviour
     private SubjiPlayerMovement player;
     private VendingMachinePurchaseZone[] vendingZones;
     private TimedWorldInteraction timedInteraction;
+    public void SetPurchaseDuration(float seconds) => purchaseDuration = Mathf.Max(0.01f, seconds);
 
     public Transform[] GetVendingMachineTransforms()
     {

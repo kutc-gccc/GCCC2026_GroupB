@@ -3,6 +3,17 @@ using UnityEngine;
 
 public class SubjiEnemyChase : MonoBehaviour
 {
+    private bool investigatingNoise;
+    private Vector2 noisePosition;
+    private float noiseExpiresAt;
+
+    public void InvestigateNoise(Vector2 position)
+    {
+        if (movementType == MovementType.CompletelyStationary) return;
+        noisePosition = position;
+        noiseExpiresAt = Time.time + 12f;
+        investigatingNoise = true;
+    }
     public static readonly HashSet<SubjiEnemyChase> ActiveEnemies = new();
     private static readonly HashSet<SubjiEnemyChase> ChasingEnemies = new();
     public static event System.Action<bool> AnyEnemyChasingChanged;
@@ -238,6 +249,17 @@ public class SubjiEnemyChase : MonoBehaviour
     {
         if (player == null)
             return;
+
+        if (investigatingNoise && (playerMovement == null || !playerMovement.IsHidden))
+        {
+            if (Time.time >= noiseExpiresAt || Vector2.Distance(transform.position, noisePosition) < 0.5f)
+                investigatingNoise = false;
+            else
+            {
+                MoveAlongRoad(noisePosition, GetChaseSpeed());
+                return;
+            }
+        }
 
         if (Time.time >= nextLightVisibilityCheckTime)
         {

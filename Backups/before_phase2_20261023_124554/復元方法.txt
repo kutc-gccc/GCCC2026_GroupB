@@ -1,0 +1,5 @@
+Unityを終了し、project_backup.zipをプロジェクト直下に展開して上書きします。
+バックアップ対象: Assets、Packages、ProjectSettings、UserSettings、Docs、ルートの通常ファイル（zip除外）。
+Library、Temp、Logs、.git、.codex-work、outputsは含みません。
+追加作業後に新規作成されたファイルは上書き復元では消えません。必要ならmanifest.jsonと照合してください。
+Unityで未保存の変更は含みません。

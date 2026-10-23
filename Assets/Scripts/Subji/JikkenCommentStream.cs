@@ -9,7 +9,7 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 [ExecuteAlways]
-public class JikkenCommentStream : MonoBehaviour
+public partial class JikkenCommentStream : MonoBehaviour
 {
     private enum TaskCompletionType
     {
@@ -18,7 +18,8 @@ public class JikkenCommentStream : MonoBehaviour
         BushHide,
         CoffeeCupLight,
         CastleLight,
-        EscapeGoal
+        EscapeGoal,
+        PhaseTask
     }
 
     [Header("自動生成")]
@@ -41,6 +42,7 @@ public class JikkenCommentStream : MonoBehaviour
         public RectTransform sourceComment;
         public TaskCompletionType completionType;
         public int subscriberReward = 100;
+        public int designTaskId;
     }
 
     [Header("通常コメント")]
@@ -89,6 +91,7 @@ public class JikkenCommentStream : MonoBehaviour
     public bool playIntroTutorial = true;
     [Tooltip("ID1を表示してからID2へ進むまでの秒数")]
     [Min(0f)] public float introFirstMessageDuration = 4f;
+    [InspectorName("タスク案内を繰り返す間隔（秒）")]
     [Min(0.5f)] public float tutorialMessageInterval = 4f;
 
     [Header("ID5～7の表示タイミング")]
@@ -190,7 +193,9 @@ public class JikkenCommentStream : MonoBehaviour
             uiRoot.SetActive(false);
             CreatePopupUi();
             SubscribeToWorldTasks();
-            if (playIntroTutorial)
+            if (enablePhaseTwoTasks)
+                InitializePhaseTasks();
+            else if (playIntroTutorial)
                 BeginIntroTutorial();
         }
     }
@@ -328,8 +333,13 @@ public class JikkenCommentStream : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
-        UpdateIntroTutorial();
-        UpdatePostTutorialSequence();
+        if (enablePhaseTwoTasks)
+            UpdatePhaseTasks();
+        else
+        {
+            UpdateIntroTutorial();
+            UpdatePostTutorialSequence();
+        }
         UpdateWorldTaskGuidance();
 
         if (isOpen && Mouse.current != null &&
@@ -940,6 +950,7 @@ public class JikkenCommentStream : MonoBehaviour
 
     private void OnDestroy()
     {
+        DisposePhaseTasks();
         SubjiEnemyChase.AnyEnemyChasingChanged -= SwitchChaseMusic;
         if (drinkItemController != null)
             drinkItemController.DrinkPurchased -= CompleteVendingTask;
@@ -991,6 +1002,8 @@ public class JikkenCommentStream : MonoBehaviour
         if (drinkItemController != null)
             drinkItemController.DrinkPurchased += CompleteVendingTask;
         BushHideSpot2D.PlayerEnteredBush += CompleteBushTask;
+        if (enablePhaseTwoTasks)
+            return;
         coffeeCupInteraction = CoffeeCupLightInteraction.FindOrCreateInScene(
             "コーヒーカップ", 4f, 6f, 3f, false);
         if (coffeeCupInteraction != null)
@@ -1288,13 +1301,22 @@ public class JikkenCommentStream : MonoBehaviour
             TryCreateEscapeTask();
         }
 
-        TrySpawnGreenGuard();
-        TryCreateCoffeeCupTask();
+        if (!enablePhaseTwoTasks)
+        {
+            TrySpawnGreenGuard();
+            TryCreateCoffeeCupTask();
+        }
 
         if (taskArrivalTriggerObject != null)
         {
             Destroy(taskArrivalTriggerObject);
             taskArrivalTriggerObject = null;
+        }
+
+        if (enablePhaseTwoTasks)
+        {
+            AdvancePhaseTasks(completedTask);
+            return;
         }
 
         if (playIntroTutorial && completedTask.isTutorialTask &&

@@ -14,6 +14,7 @@ public sealed class SubjiScenePortal : MonoBehaviour
     [Min(0.1f)] public float interactionRadius = 2.5f;
     [Tooltip("未指定なら、Eを押した場所へ戻ります")]
     public Transform returnPoint;
+    public static event System.Action<SubjiScenePortal> GoalReturned;
 
     private static SubjiScenePortal currentVisit;
     private readonly List<GameObject> suspendedRoots = new();
@@ -28,7 +29,11 @@ public sealed class SubjiScenePortal : MonoBehaviour
     public bool IsBusy => busy;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetSession() => currentVisit = null;
+    private static void ResetSession()
+    {
+        currentVisit = null;
+        GoalReturned = null;
+    }
 
     private void Start()
     {
@@ -187,6 +192,7 @@ public sealed class SubjiScenePortal : MonoBehaviour
         currentVisit = null;
         player.SetInteractionMovementLocked(false);
         busy = false;
+        GoalReturned?.Invoke(this);
     }
 
     private void SnapCamera()

@@ -2904,6 +2904,11 @@ MonoBehaviour:
   walkableTilemap: {fileID: 265379488}
   walkableTile: {fileID: 11400000, guid: 73b91c9a8cea413cbcb2ce4aa60db5be, type: 2}
   previewPlayerSprite: {fileID: 692744008591489184, guid: 54d6f6aa050d5a44caa095152696e5a9, type: 3}
+  lightViewAngle: 35
+  lightViewDistance: 5
+  lightColor: {r: 0.39215687, g: 0.7058824, b: 0.3529412, a: 0.72156864}
+  outsideDarkness: 1
+  darknessColor: {r: 0.019607844, g: 0.05882353, b: 0.02745098, a: 1}
 --- !u!4 &1849915895
 Transform:
   m_ObjectHideFlags: 0

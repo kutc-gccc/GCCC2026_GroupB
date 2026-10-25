@@ -9,6 +9,20 @@ public sealed class SubjiInteriorStage : MonoBehaviour
     public Tilemap walkableTilemap;
     public TileBase walkableTile;
     public Sprite previewPlayerSprite;
+
+    [Header("お化け屋敷内のライト設定")]
+    [InspectorName("ライトの照射角度")]
+    [Range(1f, 180f)] public float lightViewAngle = 45f;
+    [InspectorName("ライトの照射距離")]
+    [Min(0.1f)] public float lightViewDistance = 7.5f;
+    [InspectorName("ライトの色")]
+    [Tooltip("照らした部分に重ねる色。白は従来の見た目。A（透明度）で色の強さを調整できます")]
+    public Color lightColor = Color.white;
+    [InspectorName("視野外の暗さ")]
+    [Range(0f, 1f)] public float outsideDarkness = 1f;
+    [InspectorName("暗闇の色")]
+    public Color darknessColor = Color.black;
+
     private Tile boundaryTile;
 
     public Vector4 GetBlockingWallRect(Vector2 hitPoint, Vector2 direction)

@@ -144,7 +144,7 @@ public class SubjiEnemySpawner : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!Application.isPlaying)
+        if (!Application.isPlaying || (roadMap != null && roadMap.MessageScreenOpen))
             return;
 
         if (timerStyle == null)

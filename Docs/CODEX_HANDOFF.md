@@ -13,6 +13,7 @@
 
 - Unity：6000.3.11f1。
 - 通常マップ：`Assets/Scenes/subji/jikkennsupace.unity`。屋内：同ディレクトリの`HauntedHouse.unity`。
+- 屋内ライト：`HauntedHouse.unity`の`Haunted House`にある`SubjiInteriorStage`「お化け屋敷内のライト設定」で照射角度・距離・ライトの色（白は従来表示、Aで強さ）・視野外の暗さ・色を独立調整。通常入場・屋内直接再生の両方で適用。初期値は従来どおり。Unity再生確認は未実施。
 - Hierarchyの`Jikken Comment Stream`にある`JikkenCommentStream`で時間・QTE・音源・対象参照をまとめて設定。
 - 共通UI・受諾・報酬・完了：`Assets/Scripts/Subji/JikkenCommentStream.cs`。
 - フェーズ1・2の処理：同ディレクトリの`JikkenCommentStream.PhaseTasks.cs`（同じpartialクラス）。対象シーンは`enablePhaseTwoTasks`が有効。
@@ -58,3 +59,8 @@
 
 ## タイトル画面
 - 起動順先頭：Assets/Scenes/Title.unity。Assets/Title/TitleMenu.cs でSTARTボタンを再生時に生成し、jikkennsupaceへ移動。背景Canvasと画像はシーンに保存済みで編集時も表示。画像：Assets/Title/TitleBackground.png。画像のTextureImporter設定を明示し、Unityで編集時・再生時の背景とSTART表示を確認済み。ボタンからの遷移は未確認。
+
+## メッセージ画面（2026-10-25）
+- JikkenCommentStream：右にコメント、左に開始前・進行中・完了のタスクを個別表示。左のタスクをクリックで開始（同時1件）。進行中は黄、完了は緑。右上のキャンセル画像ボタンで画面を閉じる。画像は Assets/Resources/cancel_button.aseprite。通常マップの左右X座標を交換。
+- dotnet build成功（既存警告4件）。Unityでの画像取込・見た目・クリックの再生確認は未実施。変更前控え：Backups/before_message_layout_20261025。
+- 配置修正：起動・プレビュー時に保存済みRectTransformへInspector配置を無条件適用しない。Unity上で調整した枠を保持する。メッセージ画面中はSubjiRoadMap.MessageScreenOpenでミニマップと付随タスク表示を隠し、閉じると復帰。

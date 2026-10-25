@@ -129,6 +129,9 @@ public class SubjiPlayerMovement : MonoBehaviour
     private Vector2 lastOcclusionPosition;
     private Vector2 lastOcclusionDirection;
 
+    private float ActiveLightViewAngle => interiorStage != null ? interiorStage.lightViewAngle : lightViewAngle;
+    private float ActiveLightViewDistance => interiorStage != null ? interiorStage.lightViewDistance : lightViewDistance;
+
     public bool IsInInterior => interiorMovementArea != null;
     public bool IsStandalonePreview { get; set; }
 
@@ -166,10 +169,10 @@ public class SubjiPlayerMovement : MonoBehaviour
             return true;
 
         if (isLightOn && fromPlayer.sqrMagnitude <=
-            lightViewDistance * lightViewDistance)
+            ActiveLightViewDistance * ActiveLightViewDistance)
         {
             Vector2 direction = fromPlayer.normalized;
-            float minimumDot = Mathf.Cos(lightViewAngle * 0.5f * Mathf.Deg2Rad);
+            float minimumDot = Mathf.Cos(ActiveLightViewAngle * 0.5f * Mathf.Deg2Rad);
             if (Vector2.Dot(flashlightDirection, direction) >= minimumDot)
                 return true;
         }
@@ -355,13 +358,17 @@ public class SubjiPlayerMovement : MonoBehaviour
             darknessOverlay.transform.localScale = new Vector3(size, size, 1f);
         }
 
-        Color appliedDarknessColor = IsInInterior ? Color.black : darknessColor;
-        appliedDarknessColor.a *= IsInInterior ? 1f : outsideDarkness;
+        Color appliedDarknessColor = interiorStage != null ? interiorStage.darknessColor :
+            (IsInInterior ? Color.black : darknessColor);
+        appliedDarknessColor.a *= interiorStage != null ? interiorStage.outsideDarkness :
+            (IsInInterior ? 1f : outsideDarkness);
         darknessMaterial.SetColor("_Color", appliedDarknessColor);
+        darknessMaterial.SetColor("_FlashlightColor",
+            interiorStage != null ? interiorStage.lightColor : Color.white);
         darknessMaterial.SetVector("_PlayerData", new Vector4(transform.position.x,
             transform.position.y, IsInInterior ? -1f : playerVisionRadius, visionGradientWidth));
         darknessMaterial.SetVector("_FlashlightData", new Vector4(isLightOn ? 1f : 0f,
-            lightViewDistance, Mathf.Cos(lightViewAngle * 0.5f * Mathf.Deg2Rad), 0f));
+            ActiveLightViewDistance, Mathf.Cos(ActiveLightViewAngle * 0.5f * Mathf.Deg2Rad), 0f));
         darknessMaterial.SetVector("_FlashlightDirection",
             new Vector4(flashlightDirection.x, flashlightDirection.y, 0f, 0f));
         UpdateLightOcclusion();
@@ -396,7 +403,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         lastOcclusionPosition = transform.position;
         lastOcclusionDirection = flashlightDirection;
         nextOcclusionUpdate = Time.unscaledTime + 1f / 30f;
-        float halfAngle = lightViewAngle * 0.5f * Mathf.Deg2Rad;
+        float halfAngle = ActiveLightViewAngle * 0.5f * Mathf.Deg2Rad;
         float step = halfAngle * 2f / (OcclusionRayCount - 1);
         float facing = Mathf.Atan2(flashlightDirection.y, flashlightDirection.x);
         ContactFilter2D filter = new() { useTriggers = false };
@@ -405,10 +412,10 @@ public class SubjiPlayerMovement : MonoBehaviour
         {
             float angle = facing - halfAngle + step * i;
             Vector2 direction = new(Mathf.Cos(angle), Mathf.Sin(angle));
-            float distance = lightViewDistance;
+            float distance = ActiveLightViewDistance;
             Vector4 wall = new(1f, 1f, -1f, -1f);
             int count = Physics2D.Raycast(transform.position, direction, filter,
-                occlusionHits, lightViewDistance);
+                occlusionHits, ActiveLightViewDistance);
             for (int h = 0; h < count; h++)
             {
                 RaycastHit2D hit = occlusionHits[h];
@@ -483,10 +490,10 @@ public class SubjiPlayerMovement : MonoBehaviour
                 float gradient = Mathf.SmoothStep(0f, 1f,
                     Mathf.InverseLerp(clearRadius, clearRadius + gradientWidth, distance));
 
-                if (includeLightCone && distance <= lightViewDistance)
+                if (includeLightCone && distance <= ActiveLightViewDistance)
                 {
                     float angle = Mathf.Abs(Mathf.Atan2(worldY, worldX) * Mathf.Rad2Deg);
-                    if (angle <= lightViewAngle * 0.5f)
+                    if (angle <= ActiveLightViewAngle * 0.5f)
                         gradient = 0f;
                 }
 
@@ -786,7 +793,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void OnGUI()
     {
-        if (!Application.isPlaying)
+        if (!Application.isPlaying || (roadMap != null && roadMap.MessageScreenOpen))
             return;
 
         if (coordinateStyle == null)

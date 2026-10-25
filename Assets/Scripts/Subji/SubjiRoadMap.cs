@@ -60,6 +60,7 @@ public class SubjiRoadMap : MonoBehaviour
     private SubjiMovementArea2D movementArea;
 
     public Vector2 Center => center;
+    public bool MessageScreenOpen { get; set; }
 
     public bool IsReady { get; private set; }
     public bool HasTaskDestination => hasTaskDestination;
@@ -668,7 +669,7 @@ public class SubjiRoadMap : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!Application.isPlaying || player == null)
+        if (!Application.isPlaying || player == null || MessageScreenOpen)
             return;
 
         // IMGUI内では小さいdepthほど手前に描画される。

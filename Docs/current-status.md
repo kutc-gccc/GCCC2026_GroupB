@@ -1,24 +1,40 @@
 # プロジェクトの現在状況
 
-確認日：2026-10-11（Asia/Tokyo）
+確認日：2026-10-20（Asia/Tokyo）
 
 ## 開発環境と履歴
 
 - Unity：`6000.3.11f1`
-- 作業ブランチ：`1011`
-- 最新コミット：`3ab4f81`「フリーフォール作成」
-- 最新コミットには、アニメーション、Prefab、画像などの追加と、シーン・描画設定の変更が含まれる。
+- 作業ブランチ：`main`
+- 最新コミット：`e41af24`「Merge pull request #47 from kutc-gccc/1011」
+- 直近のコミット：`1e006d3`「tail」、`4922e46`「汽車の煙作成」、`3ab4f81`「フリーフォール作成」。
+- ユーザーからpull済みとの連絡を受け、現在のローカル状態を記録した。
 
-## この記録を作成する前の未コミット変更
+## この記録を更新する前の未コミット変更
 
-- `Assets/Scenes/subji/jikkennsupace.unity`：Gitでは変更扱いだが、内容の差分は表示されていない。
-- `Assets/TextMesh Pro/Fonts/NotoSansJP-VariableFont_wght SDF.asset`：63行追加、9行削除。
+- `Assets/TextMesh Pro/Fonts/NotoSansJP-VariableFont_wght SDF.asset`：9行追加、63行削除。
 - C#スクリプトの未コミット変更はない。
+- 上記の既存変更はそのまま保持している。
+
+## 実装時の共通方針
+
+- 敵は原則 `SubjiEnemyChase`、タスクは原則 `JikkenCommentStream` を共用する。
+- 時間付き操作は `TimedWorldInteraction` を共用する。
+- 個体差・タスク差は設定や固有条件に限定し、共通処理を複製しない。
+- 検索・読込・検証は必要な範囲に絞る。詳細はルートの `AGENTS.md` に従う。
 
 ## 確認範囲
 
 Gitの履歴、ファイルの変更状況、Unityのバージョンを確認済み。
 ゲームの動作とUnityのエラー有無は未確認。
-本記録の作成に伴うゲーム本体の編集は行っていない。
+今回の作業では本記録のみ更新し、ゲーム本体は編集していない。
 
 過去のPull記録は `pull-snapshot-2026-08-27.md` に保存されている。
+
+## お化け屋敷の仮ステージ（2026-10-20）
+
+- `Assets/Scenes/subji/HauntedHouse.unity` を追加。通常マップからEで入場し、出口に触れると帰還する。
+- 屋内だけライト以外の視野を無効化し、完全な暗闇にする。通常マップの明るさ設定は維持する。
+- プレイヤー・所持品・タスク情報を保持し、滞在中は屋外ワールドとタスク更新を停止する。
+- UnityのPlay Modeで入場・出口Triggerによる帰還と状態維持を確認済み。
+- 編集方法と再確認手順は `haunted-house.md` を参照。

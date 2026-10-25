@@ -11,6 +11,9 @@ public sealed class TimedWorldInteraction : MonoBehaviour
     private float duration;
     private float elapsed;
     private GUIStyle labelStyle;
+    private bool cancelOnMovement;
+    public event Action Ended;
+    public float Elapsed => elapsed;
 
     public bool IsRunning { get; private set; }
 
@@ -20,7 +23,7 @@ public sealed class TimedWorldInteraction : MonoBehaviour
         enabled = false;
     }
 
-    public bool Begin(float seconds, Action onCompleted)
+    public bool Begin(float seconds, Action onCompleted, bool allowMovementCancel = true)
     {
         if (IsRunning || player == null || onCompleted == null)
             return false;
@@ -28,6 +31,7 @@ public sealed class TimedWorldInteraction : MonoBehaviour
         duration = Mathf.Max(0.01f, seconds);
         elapsed = 0f;
         completedAction = onCompleted;
+        cancelOnMovement = allowMovementCancel;
         IsRunning = true;
         player.SetInteractionMovementLocked(true);
         enabled = true;
@@ -36,7 +40,7 @@ public sealed class TimedWorldInteraction : MonoBehaviour
 
     private void Update()
     {
-        if (player.HasMovementInput(MovementCancelThreshold))
+        if (cancelOnMovement && player.HasMovementInput(MovementCancelThreshold))
         {
             Cancel();
             return;
@@ -66,6 +70,7 @@ public sealed class TimedWorldInteraction : MonoBehaviour
         elapsed = 0f;
         player.SetInteractionMovementLocked(false);
         enabled = false;
+        Ended?.Invoke();
     }
 
     private void OnGUI()
@@ -95,12 +100,18 @@ public sealed class TimedWorldInteraction : MonoBehaviour
         }
 
         GUI.color = Color.white;
-        GUI.Label(background, "操作中（移動でキャンセル）", labelStyle);
+        GUI.Label(background, cancelOnMovement ? "操作中（移動でキャンセル）" : "乗車中", labelStyle);
     }
 
     private void OnDestroy()
     {
         if (IsRunning && player != null)
             player.SetInteractionMovementLocked(false);
+    }
+
+    private void OnDisable()
+    {
+        if (IsRunning)
+            Cancel();
     }
 }

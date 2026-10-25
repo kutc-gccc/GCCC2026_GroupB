@@ -108,7 +108,7 @@ public partial class JikkenCommentStream : MonoBehaviour
     [Min(1f)] public float commentHeight = 58f;
     public Color normalTextColor = Color.white;
     public Color taskTextColor = new Color(1f, 0.25f, 0.25f, 1f);
-    public Color panelColor = new Color(0.03f, 0.32f, 0.45f, 0.97f);
+    public Color panelColor = new Color(0.03f, 0.32f, 0.45f, 1f);
 
     [Header("発生コメント表示")]
     [Min(0.1f)] public float popupDuration = 3f;
@@ -119,10 +119,10 @@ public partial class JikkenCommentStream : MonoBehaviour
     [Header("枠のレイアウト")]
     [Tooltip("画面全体の端からの余白（px）")]
     [Min(0f)] public float screenMargin = 8f;
-    [Tooltip("左のコメント枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
-    public Rect commentPanelRect = new Rect(0.015f, 0.02f, 0.475f, 0.96f);
-    [Tooltip("右のタスク枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
-    public Rect taskPanelRect = new Rect(0.51f, 0.02f, 0.475f, 0.96f);
+    [Tooltip("右のコメント枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
+    public Rect commentPanelRect = new Rect(0.51f, 0.02f, 0.475f, 0.96f);
+    [Tooltip("左のタスク枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
+    public Rect taskPanelRect = new Rect(0.015f, 0.02f, 0.475f, 0.96f);
     [Tooltip("枠内側の文字余白（px）")]
     [Min(0f)] public float panelContentPadding = 28f;
 
@@ -133,6 +133,7 @@ public partial class JikkenCommentStream : MonoBehaviour
     [Min(0.0001f)] public float editorPreviewScale = 0.01f;
 
     private readonly List<RectTransform> comments = new List<RectTransform>();
+    private readonly List<RectTransform> taskEntries = new List<RectTransform>();
     private GameObject uiRoot;
     private GameObject popupRoot;
     private TextMeshProUGUI popupLabel;
@@ -304,6 +305,8 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private void OnEnable()
     {
+        if (Application.isPlaying && roadMap != null)
+            roadMap.MessageScreenOpen = isOpen;
         if (!Application.isPlaying)
             EnsureUiExists(false);
     }
@@ -379,6 +382,8 @@ public partial class JikkenCommentStream : MonoBehaviour
 
         isOpen = !isOpen;
         uiRoot.SetActive(isOpen);
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = isOpen;
 
         if (isOpen && popupRoot != null)
         {
@@ -394,6 +399,8 @@ public partial class JikkenCommentStream : MonoBehaviour
 
         isOpen = true;
         uiRoot.SetActive(true);
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = true;
 
         if (popupRoot != null)
         {
@@ -405,6 +412,8 @@ public partial class JikkenCommentStream : MonoBehaviour
     public void CloseCommentScreen()
     {
         isOpen = false;
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = false;
         if (uiRoot != null)
             uiRoot.SetActive(false);
     }
@@ -524,6 +533,13 @@ public partial class JikkenCommentStream : MonoBehaviour
             }
         }
 
+        RectTransform backdrop = uiRoot.transform.Find("Backdrop") as RectTransform;
+        if (backdrop != null)
+            Stretch(backdrop, 0f, 0f, 1f, 1f, 0f);
+        MakeBackgroundOpaque(backdrop);
+        MakeBackgroundOpaque(uiRoot.transform.Find("コメント Panel"));
+        MakeBackgroundOpaque(uiRoot.transform.Find("タスク Panel"));
+        EnsureCloseButton();
         uiRoot.SetActive(true);
         ConfigureCanvasForCurrentMode();
 
@@ -578,7 +594,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         RectTransform taskPanel = canvasTransform.Find("タスク Panel") as RectTransform;
 
         if (backdrop != null)
-            Stretch(backdrop, 0f, 0f, 1f, 1f, screenMargin);
+            Stretch(backdrop, 0f, 0f, 1f, 1f, 0f);
         ApplyPanelRect(commentPanel, commentPanelRect);
         ApplyPanelRect(taskPanel, taskPanelRect);
 
@@ -618,13 +634,58 @@ public partial class JikkenCommentStream : MonoBehaviour
         eventSystem.transform.SetParent(transform, false);
     }
 
+    private void EnsureCloseButton()
+    {
+        Transform existing = uiRoot.transform.Find("Close Messages Button");
+        if (existing != null)
+        {
+            Button existingButton = existing.GetComponent<Button>();
+            existingButton.onClick.RemoveListener(CloseCommentScreen);
+            existingButton.onClick.AddListener(CloseCommentScreen);
+            return;
+        }
+
+        GameObject close = new GameObject("Close Messages Button", typeof(RectTransform),
+            typeof(Image), typeof(Button));
+        close.transform.SetParent(uiRoot.transform, false);
+        RectTransform rect = close.GetComponent<RectTransform>();
+        rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
+        rect.anchoredPosition = new Vector2(-24f, -24f);
+        rect.sizeDelta = new Vector2(64f, 64f);
+        Image image = close.GetComponent<Image>();
+        Sprite[] sprites = Resources.LoadAll<Sprite>("cancel_button");
+        if (sprites.Length > 0)
+        {
+            image.sprite = sprites[0];
+            image.preserveAspect = true;
+        }
+        else
+        {
+            GameObject label = CreateTextObject("Close Label", close.transform, "×", 48f, Color.white);
+            Stretch(label.GetComponent<RectTransform>(), 0f, 0f, 1f, 1f, 0f);
+            label.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        }
+        Button button = close.GetComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(CloseCommentScreen);
+    }
+
+    private static void MakeBackgroundOpaque(Transform target)
+    {
+        if (target == null || !target.TryGetComponent<Image>(out var image))
+            return;
+        Color color = image.color;
+        color.a = 1f;
+        image.color = color;
+    }
+
     private void CreateBackdrop(Transform parent)
     {
         GameObject backdrop = new GameObject("Backdrop", typeof(RectTransform), typeof(Image));
         backdrop.transform.SetParent(parent, false);
         RectTransform rect = backdrop.GetComponent<RectTransform>();
-        Stretch(rect, 0f, 0f, 1f, 1f, screenMargin);
-        backdrop.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f, 0.96f);
+        Stretch(rect, 0f, 0f, 1f, 1f, 0f);
+        backdrop.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f, 1f);
     }
 
     private RectTransform CreatePanel(Transform parent, string title, Rect layout)
@@ -676,7 +737,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             return;
 
         GameObject comment = CreateTextObject(isTask ? "Task Comment" : "Comment",
-            commentContent, message, fontSize, isTask ? taskTextColor : normalTextColor);
+            isTask ? taskContent : commentContent, message, fontSize, isTask ? taskTextColor : normalTextColor);
         RectTransform rect = comment.GetComponent<RectTransform>();
         ConfigureListItem(rect);
 
@@ -700,7 +761,10 @@ public partial class JikkenCommentStream : MonoBehaviour
         ShowPopup(comment.GetComponent<TextMeshProUGUI>().text,
             isTask ? taskTextColor : popupTextColor);
 
-        comments.Insert(0, rect);
+        if (isTask)
+            taskEntries.Insert(0, rect);
+        else
+            comments.Insert(0, rect);
         PlayCommentAppearedSound();
         ArrangeComments();
         while (comments.Count > maximumComments)
@@ -738,7 +802,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             if (!tutorialStep3CommentCreated)
             {
                 AddTutorialHistoryComment(
-                    "マウススクロールしてコメント左クリックでタスクを確認しよう",
+                    "マウススクロールでメッセージを開き、左のタスクを確認しよう",
                     normalTextColor);
                 tutorialStep3CommentCreated = true;
                 tutorialTimer = tutorialMessageInterval;
@@ -752,7 +816,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             }
             else if (tutorialTimer <= 0f)
             {
-                ShowPopup("マウススクロールしてコメント左クリックでタスクを確認しよう",
+                ShowPopup("マウススクロールでメッセージを開き、左のタスクを確認しよう",
                     popupTextColor);
                 PlayCommentAppearedSound();
                 tutorialTimer = tutorialMessageInterval;
@@ -763,14 +827,14 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (tutorialStep == 4 && tutorialTimer <= 0f)
         {
             bool isLoopPlayback = tutorialTaskCommentCreated;
-            ShowPopup("コメントの赤文字をクリックしてみて右クリで閉じれるよ", popupTextColor);
+            ShowPopup("左のタスクをクリックして開始。右上の×ボタンで閉じられるよ", popupTextColor);
             if (isLoopPlayback)
                 PlayCommentAppearedSound();
             tutorialTimer = tutorialMessageInterval;
             if (!tutorialTaskCommentCreated)
             {
                 GameObject instruction = CreateTextObject("Tutorial Instruction", commentContent,
-                    "コメントの赤文字をクリックしてみて右クリで閉じれるよ",
+                    "左のタスクをクリックして開始。右上の×ボタンで閉じられるよ",
                     fontSize, normalTextColor);
                 RectTransform instructionRect = instruction.GetComponent<RectTransform>();
                 ConfigureListItem(instructionRect);
@@ -794,14 +858,14 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private void CreateSelectableTaskComment(string message, Action<RectTransform> onSelected)
     {
-        GameObject comment = CreateTextObject("Tutorial Task Comment", commentContent,
+        GameObject comment = CreateTextObject("Selectable Task", taskContent,
             message, fontSize, taskTextColor);
         RectTransform rect = comment.GetComponent<RectTransform>();
         ConfigureListItem(rect);
         Button button = comment.AddComponent<Button>();
         button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
         button.onClick.AddListener(() => onSelected(rect));
-        comments.Insert(0, rect);
+        taskEntries.Insert(0, rect);
         PlayCommentAppearedSound();
         ArrangeComments();
         ShowPopup(message, taskTextColor);
@@ -858,7 +922,7 @@ public partial class JikkenCommentStream : MonoBehaviour
                 player = playerMovement.transform;
         }
 
-        // コメントをクリックした時点で受諾と選択を同時に行う。
+        // 左のタスクをクリックした時点で受諾と選択を同時に行う。
         SelectTask(acceptedTask);
         if (tutorialStep == 4 && isTutorialTask)
             tutorialStep = 5;
@@ -871,6 +935,11 @@ public partial class JikkenCommentStream : MonoBehaviour
 
         PlayTaskSelectedSound();
         selectedTask = task;
+        if (task.sourceComment != null)
+        {
+            task.sourceComment.GetComponent<TextMeshProUGUI>().text = "【進行中】\n" + task.displayText;
+            ArrangeComments();
+        }
 
         if (roadMap != null && task.completionType == TaskCompletionType.Destination)
         {
@@ -937,6 +1006,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
         if (sourceLabel != null)
         {
+            sourceLabel.text = sourceLabel.text.Replace("【進行中】", "【完了】");
             sourceLabel.color = new Color(0.35f, 1f, 0.45f, 1f);
             sourceLabel.fontStyle = FontStyles.Bold;
             sourceLabel.raycastTarget = false;
@@ -985,15 +1055,8 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private RectTransform CreateTaskView(string message)
     {
-        if (taskContent == null)
-            return null;
-
-        GameObject task = CreateTextObject("Active Task", taskContent, message,
-            fontSize, normalTextColor);
-        RectTransform rect = task.GetComponent<RectTransform>();
-        ConfigureListItem(rect);
-        task.GetComponent<TextMeshProUGUI>().raycastTarget = false;
-        return rect;
+        // 選択元のタスクをそのまま進行表示に使い、二重表示を防ぐ。
+        return null;
     }
 
     private void SubscribeToWorldTasks()
@@ -1481,20 +1544,26 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private void ArrangeComments()
     {
-        for (int i = comments.Count - 1; i >= 0; i--)
+        ArrangeList(taskEntries);
+        ArrangeList(comments);
+    }
+
+    private void ArrangeList(List<RectTransform> entries)
+    {
+        for (int i = entries.Count - 1; i >= 0; i--)
         {
-            if (comments[i] == null)
+            if (entries[i] == null)
             {
-                comments.RemoveAt(i);
+                entries.RemoveAt(i);
             }
         }
 
         float verticalOffset = 0f;
-        for (int i = 0; i < comments.Count; i++)
+        for (int i = 0; i < entries.Count; i++)
         {
-            UpdateListItemHeight(comments[i]);
-            comments[i].anchoredPosition = new Vector2(0f, -verticalOffset);
-            verticalOffset += comments[i].sizeDelta.y;
+            UpdateListItemHeight(entries[i]);
+            entries[i].anchoredPosition = new Vector2(0f, -verticalOffset);
+            verticalOffset += entries[i].sizeDelta.y;
         }
     }
 

@@ -231,7 +231,7 @@ public partial class JikkenCommentStream
         else if (introPhaseStep == 4 && introPhaseTimer <= 0f)
         {
             PhaseMessage("うぽつです。");
-            PhaseMessage("スクロールでコメントを開き、赤文字をクリックしてタスクを選ぼう。右クリックで閉じられるよ");
+            PhaseMessage("スクロールでメッセージを開き、左のタスクをクリックして開始しよう。右上の×ボタンで閉じられるよ");
             introPhaseStep = 5;
             OfferPhaseTask(1);
         }
@@ -262,7 +262,7 @@ public partial class JikkenCommentStream
     {
         string message = "◆ " + PhaseTaskName(id);
         CreateSelectableTaskComment(message, rect => AcceptPhaseTask(rect, id));
-        ShowPopup(message + "（コメントから選択）", popupTextColor);
+        ShowPopup(message + "（左のタスク欄から開始）", popupTextColor);
     }
 
     private void AcceptPhaseTask(RectTransform source, int id)
@@ -416,6 +416,8 @@ public partial class JikkenCommentStream
 
     private void OnDisable()
     {
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = false;
         if (!Application.isPlaying || !enablePhaseTwoTasks) return;
         if (whistleRunning || ridingFreeFall) phaseInteraction?.Cancel();
         if (qteIndex >= 0)

@@ -1,6 +1,10 @@
 Shader "Subji/Static Darkness Reveal"
 {
-    Properties { _Color ("Darkness Color", Color) = (0,0,0,1) }
+    Properties
+    {
+        _Color ("Darkness Color", Color) = (0,0,0,1)
+        _FlashlightColor ("Flashlight Color", Color) = (1,1,1,1)
+    }
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
@@ -19,6 +23,7 @@ Shader "Subji/Static Darkness Reveal"
             struct v2f { float4 vertex : SV_POSITION; float2 worldPos : TEXCOORD0; };
 
             fixed4 _Color;
+            fixed4 _FlashlightColor;
             float4 _PlayerData;
             float4 _FlashlightData;
             float4 _FlashlightDirection;
@@ -42,6 +47,7 @@ Shader "Subji/Static Darkness Reveal"
             {
                 float2 fromPlayer = input.worldPos - _PlayerData.xy;
                 float playerDistance = length(fromPlayer);
+                float flashlightReveal = 0.0;
                 float darkness = _PlayerData.z < 0.0 ? 1.0 : smoothstep(_PlayerData.z,
                     _PlayerData.z + max(0.001, _PlayerData.w), playerDistance);
 
@@ -79,6 +85,7 @@ Shader "Subji/Static Darkness Reveal"
                                 }
                             }
                         }
+                        flashlightReveal = 1.0 - darkness;
                     }
                 }
 
@@ -92,7 +99,14 @@ Shader "Subji/Static Darkness Reveal"
                     darkness = min(darkness, lightDarkness);
                 }
 
-                return fixed4(_Color.rgb, _Color.a * darkness);
+                // 白は無着色。壁で遮られた部分にはライトの色を重ねない。
+                float tintAlpha = flashlightReveal * _FlashlightColor.a *
+                    (1.0 - min(_FlashlightColor.r, min(_FlashlightColor.g, _FlashlightColor.b)));
+                float darkAlpha = _Color.a * darkness;
+                float alpha = darkAlpha + tintAlpha * (1.0 - darkAlpha);
+                float3 color = (_Color.rgb * darkAlpha + _FlashlightColor.rgb *
+                    tintAlpha * (1.0 - darkAlpha)) / max(alpha, 0.00001);
+                return fixed4(color, alpha);
             }
             ENDCG
         }

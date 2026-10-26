@@ -3,12 +3,14 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;
 
 public sealed class TitleMenu : MonoBehaviour
 {
     [SerializeField] private Texture2D background;
     [SerializeField] private Canvas titleCanvas;
     [SerializeField] private RawImage backgroundImage;
+    [SerializeField] private TMP_FontAsset menuFont;
 
     private void Awake()
     {
@@ -42,8 +44,8 @@ public sealed class TitleMenu : MonoBehaviour
         var button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(() =>
         {
-            button.interactable = false;
-            SceneManager.LoadScene("jikkennsupace");
+            buttonObject.SetActive(false);
+            ShowTutorialChoice(canvas.transform);
         });
 
         var labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
@@ -68,5 +70,59 @@ public sealed class TitleMenu : MonoBehaviour
 
         var events = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         events.GetComponent<EventSystem>().SetSelectedGameObject(buttonObject);
+    }
+
+    private void ShowTutorialChoice(Transform parent)
+    {
+        var panel = new GameObject("Tutorial Choice", typeof(RectTransform), typeof(Image));
+        panel.transform.SetParent(parent, false);
+        panel.GetComponent<RectTransform>().sizeDelta = new Vector2(720, 320);
+        panel.GetComponent<Image>().color = new Color(0.08f, 0.05f, 0.16f, 0.98f);
+        var prompt = new GameObject("Prompt", typeof(RectTransform), typeof(TextMeshProUGUI));
+        prompt.transform.SetParent(panel.transform, false);
+        var text = prompt.GetComponent<TextMeshProUGUI>();
+        text.font = menuFont;
+        text.text = "チュートリアルをプレイしますか？";
+        text.fontSize = 32;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+        text.rectTransform.sizeDelta = new Vector2(680, 80);
+        text.rectTransform.anchoredPosition = new Vector2(0, 100);
+        bool loading = false;
+        var play = CreateChoiceButton(panel.transform, "チュートリアルをプレイ", 10);
+        var skip = CreateChoiceButton(panel.transform, "スキップして本編へ", -90);
+        void StartGame(bool tutorial)
+        {
+            if (loading) return;
+            loading = true;
+            play.interactable = skip.interactable = false;
+            JikkenCommentStream.ContinueTutorialFromTitle = tutorial;
+            SceneManager.LoadScene(tutorial ? "Tutorial" : "jikkennsupace");
+        }
+        play.onClick.AddListener(() => StartGame(true));
+        skip.onClick.AddListener(() => StartGame(false));
+        EventSystem.current.SetSelectedGameObject(play.gameObject);
+    }
+
+    private Button CreateChoiceButton(Transform parent, string caption, float y)
+    {
+        var go = new GameObject(caption, typeof(RectTransform), typeof(Image), typeof(Button));
+        go.transform.SetParent(parent, false);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchoredPosition = new Vector2(0, y);
+        rect.sizeDelta = new Vector2(580, 75);
+        go.GetComponent<Image>().color = new Color(0.22f, 0.14f, 0.38f);
+        var label = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        label.transform.SetParent(go.transform, false);
+        var text = label.GetComponent<TextMeshProUGUI>();
+        text.font = menuFont;
+        text.text = caption;
+        text.fontSize = 30;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+        text.rectTransform.anchorMin = Vector2.zero;
+        text.rectTransform.anchorMax = Vector2.one;
+        text.rectTransform.offsetMin = text.rectTransform.offsetMax = Vector2.zero;
+        return go.GetComponent<Button>();
     }
 }

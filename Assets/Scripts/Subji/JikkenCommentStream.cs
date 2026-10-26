@@ -19,7 +19,8 @@ public partial class JikkenCommentStream : MonoBehaviour
         CoffeeCupLight,
         CastleLight,
         EscapeGoal,
-        PhaseTask
+        PhaseTask,
+        TutorialLight
     }
 
     [Header("自動生成")]
@@ -193,10 +194,13 @@ public partial class JikkenCommentStream : MonoBehaviour
             ConfigureTaskCompletedSound();
             uiRoot.SetActive(false);
             CreatePopupUi();
-            SubscribeToWorldTasks();
-            if (enablePhaseTwoTasks)
+            if (IsTutorialScene)
+                BeginDedicatedTutorial();
+            else
+                SubscribeToWorldTasks();
+            if (!IsTutorialScene && enablePhaseTwoTasks)
                 InitializePhaseTasks();
-            else if (playIntroTutorial)
+            else if (!IsTutorialScene && playIntroTutorial)
                 BeginIntroTutorial();
         }
     }
@@ -336,7 +340,9 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
-        if (enablePhaseTwoTasks)
+        if (IsTutorialScene)
+            UpdateDedicatedTutorial();
+        else if (enablePhaseTwoTasks)
             UpdatePhaseTasks();
         else
         {
@@ -351,7 +357,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             CloseCommentScreen();
         }
 
-        if (popupRoot != null && popupRoot.activeSelf)
+        if (!IsTutorialScene && popupRoot != null && popupRoot.activeSelf)
         {
             if (isOpen)
             {
@@ -385,7 +391,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (roadMap != null)
             roadMap.MessageScreenOpen = isOpen;
 
-        if (isOpen && popupRoot != null)
+        if (!IsTutorialScene && isOpen && popupRoot != null)
         {
             popupRoot.SetActive(false);
             popupTimer = 0f;
@@ -402,7 +408,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (roadMap != null)
             roadMap.MessageScreenOpen = true;
 
-        if (popupRoot != null)
+        if (!IsTutorialScene && popupRoot != null)
         {
             popupRoot.SetActive(false);
             popupTimer = 0f;
@@ -467,7 +473,7 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private void ShowPopup(string message, Color color, float duration = -1f)
     {
-        if (isOpen || popupRoot == null || popupLabel == null)
+        if (IsTutorialScene || isOpen || popupRoot == null || popupLabel == null)
             return;
 
         popupLabel.text = message;
@@ -639,6 +645,12 @@ public partial class JikkenCommentStream : MonoBehaviour
         Transform existing = uiRoot.transform.Find("Close Messages Button");
         if (existing != null)
         {
+            Sprite[] replacementSprites = Resources.LoadAll<Sprite>("cancel_button");
+            if (replacementSprites.Length > 0 && existing.TryGetComponent<Image>(out var existingImage))
+            {
+                existingImage.sprite = replacementSprites[0];
+                existingImage.preserveAspect = true;
+            }
             Button existingButton = existing.GetComponent<Button>();
             existingButton.onClick.RemoveListener(CloseCommentScreen);
             existingButton.onClick.AddListener(CloseCommentScreen);
@@ -1334,6 +1346,9 @@ public partial class JikkenCommentStream : MonoBehaviour
             roadMap?.ClearTaskDestination();
         else
             roadMap?.ClearActiveTaskText();
+
+        if (completedTask.completionType == TaskCompletionType.TutorialLight)
+            return;
 
         if (completedTask.completionType == TaskCompletionType.VendingPurchase)
         {

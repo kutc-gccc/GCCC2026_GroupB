@@ -17,7 +17,7 @@ public sealed class ItemSlotSelector : MonoBehaviour
 
     [Header("Comment Item")]
     [Min(0)]
-    [SerializeField] private int commentSlotIndex;
+    [SerializeField] private int commentSlotIndex = 1;
     [SerializeField] private JikkenCommentStream commentStream;
 
     private readonly List<RectTransform> slots = new();

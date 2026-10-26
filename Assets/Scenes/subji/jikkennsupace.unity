@@ -7025,11 +7025,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 120
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 120
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_LocalPosition.x
@@ -7061,7 +7061,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -200
+      value: -80
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -7740,11 +7740,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 120
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 120
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_LocalPosition.x
@@ -7776,7 +7776,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -200
+      value: -80
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -10940,11 +10940,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 100
+      value: 120
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 100
+      value: 120
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10976,7 +10976,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -80
+      value: -200
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -70897,11 +70897,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 100
+      value: 120
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 100
+      value: 120
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_LocalPosition.x
@@ -70933,7 +70933,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -80
+      value: -200
       objectReference: {fileID: 0}
     - target: {fileID: 3884030465672700926, guid: f309cdfe742c7fd469d3df2395d8ab02, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -72287,7 +72287,7 @@ MonoBehaviour:
   darknessColor: {r: 0, g: 0, b: 0, a: 1}
   darknessOverlaySize: 40
   darknessTextureResolution: 256
-  lightSlotNumber: 2
+  lightSlotNumber: 1
   lightViewAngle: 30
   lightViewDistance: 5.5
   enemySpawnOffset: {x: 10, y: 0}
@@ -72860,7 +72860,7 @@ MonoBehaviour:
   selectedSize: {x: 120, y: 120}
   initialSelectedIndex: 0
   invertScrollDirection: 0
-  commentSlotIndex: 0
+  commentSlotIndex: 1
   commentStream: {fileID: 0}
 --- !u!114 &1017713419
 MonoBehaviour:
@@ -126333,7 +126333,7 @@ MonoBehaviour:
   selectedSize: {x: 120, y: 120}
   initialSelectedIndex: 0
   invertScrollDirection: 0
-  commentSlotIndex: 0
+  commentSlotIndex: 1
   commentStream: {fileID: 0}
 --- !u!114 &1629936788
 MonoBehaviour:
@@ -215507,6 +215507,58 @@ MonoBehaviour:
   phaseTwoOrder: 
   currentPhase: 1
   phaseTwoCompleted: 0
+  continueAfterTutorial: 0
+  tutorialComments:
+  - text: "\u914D\u4FE1\u306E\u4E88\u884C\u7DF4\u7FD2\u3068\u3057\u3066\u64CD\u4F5C\u65B9\u6CD5\u306B\u3064\u3044\u3066\u8AAC\u660E\u3057\u307E\u3059\u3002"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2.5
+  - text: "\u307E\u305A\u57FA\u672C\u306E\u64CD\u4F5C\u306B\u3064\u3044\u3066"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "WASD\u3067\u79FB\u52D5\u3059\u308B\u3053\u3068\u304C\u3067\u304D\u307E\u3059\u3002"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "Q1. 4\u79D2\u9593\u79FB\u52D5\u3057\u3066\u307F\u3088\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 4
+  - text: "\u6B21\u306B\u30C0\u30C3\u30B7\u30E5\u306B\u3064\u3044\u3066"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "Shift\u3092\u62BC\u3057\u306A\u304C\u3089\u79FB\u52D5\u3059\u308B\u3068\u901F\u304F\u79FB\u52D5\u3067\u304D\u307E\u3059\u3002"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "Q2. 2\u79D2\u9593\u30C0\u30C3\u30B7\u30E5\u3057\u3066\u307F\u3088\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u30C0\u30C3\u30B7\u30E5\u306F\u30B2\u30FC\u30B8\u5236\u306A\u306E\u3067\u4F7F\u3044\u3059\u304E\u306B\u306F\u6CE8\u610F"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u6B21\u306F\u30E1\u30C3\u30BB\u30FC\u30B8\u753B\u9762\u3092\u78BA\u8A8D\u3057\u3088\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "Q3. \u30DE\u30A6\u30B9\u30DB\u30A4\u30FC\u30EB\u3067\u30E1\u30C3\u30BB\u30FC\u30B8\u3092\u9078\u629E\u3057\u3001\u5DE6\u30AF\u30EA\u30C3\u30AF\u3067\u958B\u3053\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u53F3\u5074\u304C\u30B3\u30E1\u30F3\u30C8\u6B04\u3001\u5DE6\u5074\u304C\u8996\u8074\u8005\u304B\u3089\u306E\u8981\u671B\u306B\u5FDC\u3048\u308B\u30BF\u30B9\u30AF\u6B04\u3068\u306A\u3063\u3066\u3044\u307E\u3059\u3002"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u5DE6\u306E\u30BF\u30B9\u30AF\u3092\u5DE6\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u53D7\u6CE8\u3067\u304D\u308B\u3088"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "Q4. \u30BF\u30B9\u30AF\u3092\u53D7\u6CE8\u3057\u3066\u307F\u3088\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u53F3\u4E0A\u306E\xD7\u3067\u753B\u9762\u3092\u9589\u3058\u3001\u30DE\u30A6\u30B9\u30DB\u30A4\u30FC\u30EB\u3067\u30E9\u30A4\u30C8\u3092\u9078\u3093\u3067\u5DE6\u30AF\u30EA\u30C3\u30AF\u3057\u3088\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  - text: "\u3053\u308C\u3067\u64CD\u4F5C\u8AAC\u660E\u306F\u7D42\u308F\u308A\u3002\u914D\u4FE1\u306E\u6E96\u5099\u3092\u3057\u3066\u304A\u3053\u3046"
+    sender: "\u30CA\u30D3\u30B2\u30FC\u30BF\u30FC"
+    seconds: 2
+  tutorialOkSeconds: 1.5
+  tutorialBlackoutSeconds: 5
+  tutorialFadeSeconds: 0.5
+  tutorialQuestionColor: {r: 1, g: 0.88, b: 0.25, a: 1}
+  tutorialOkColor: {r: 0.35, g: 1, b: 0.45, a: 1}
   autoGenerateComments: 0
   words:
   - "\u3042\u3042\u3042\u3042"
@@ -215527,7 +215579,7 @@ MonoBehaviour:
   taskCompletedSound: {fileID: 0}
   taskCompletedSoundVolume: 1
   taskArrivalDistance: 1
-  playIntroTutorial: 1
+  playIntroTutorial: 0
   introFirstMessageDuration: 4
   tutorialMessageInterval: 4
   id5To6Delay: 2

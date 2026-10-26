@@ -64,3 +64,13 @@
 - JikkenCommentStream：右にコメント、左に開始前・進行中・完了のタスクを個別表示。左のタスクをクリックで開始（同時1件）。進行中は黄、完了は緑。右上のキャンセル画像ボタンで画面を閉じる。画像は Assets/Resources/cancel_button.aseprite。通常マップの左右X座標を交換。
 - dotnet build成功（既存警告4件）。Unityでの画像取込・見た目・クリックの再生確認は未実施。変更前控え：Backups/before_message_layout_20261025。
 - 配置修正：起動・プレビュー時に保存済みRectTransformへInspector配置を無条件適用しない。Unity上で調整した枠を保持する。メッセージ画面中はSubjiRoadMap.MessageScreenOpenでミニマップと付随タスク表示を隠し、閉じると復帰。
+
+## タスクバー（2026-10-26）
+- 左からライト、メッセージ、飲料の順。ItemSlotSelector.commentSlotIndex=1、SubjiPlayerMovement.lightSlotNumber=1。通常マップ内の両スロットCanvasとアイコン追加メニューも対応。再生確認は未実施。
+
+## 専用チュートリアル（2026-10-26）
+- シーン：Assets/Scenes/subji/Tutorial.unity。既存マップ・UIを再利用。単独再生可能で、標準は完了時に本編へ進まない。Jikken Comment Streamの「専用チュートリアル」で文言・秒数・色・完了後遷移を調整。
+- 進行：JikkenCommentStream.Tutorial.cs（同じpartial）。移動累計4秒→ダッシュ累計2秒→画面を開く→練習タスク受注→ライト点灯。Spaceの押下1回で1工程送り。練習報酬0。暗闇生成なし、敵オブジェクト非アクティブ・スポーナー停止・追加敵生成なし。
+- TitleMenuのSTARTからプレイ／スキップを選択。タイトル経由の練習完了後は5秒暗転して本編へ。本編はplayIntroTutorial=falseでID1開始。両経路とも本編シーンの既存初期配置を使用。Build SettingsにTutorial登録済み。
+- 変更前控え：Backups/before_tutorial_20261026。dotnet build成功（既存警告4件）。Unityのバックグラウンド起動は終了コード1で停止し、Play Mode・見た目の確認は未実施。
+- コメント表示更新：Tutorialも本編のcomment.aseprite画像枠（CreatePopupUi）を共用。指定元F:/gameseisaku/comment.asepriteと同一画像。メッセージ画面中も案内を維持。コメント出現音を共用し、問題OK時にも本編の達成音。説明・OK待ちは3秒（移動4秒・ダッシュ2秒・暗転5秒は維持）。コンパイル成功、再生確認未実施。

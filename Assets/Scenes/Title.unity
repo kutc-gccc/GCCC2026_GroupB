@@ -44,6 +44,7 @@ MonoBehaviour:
   titleCanvas: {fileID: 202}
   backgroundImage: {fileID: 303}
   background: {fileID: 2800000, guid: fd12a7cb0bd04afdbf1df409c1fe1b7e, type: 3}
+  menuFont: {fileID: 11400000, guid: 2cab1695818d4f1aa66d42434d2f3464, type: 2}
 --- !u!1 &200
 GameObject:
   m_ObjectHideFlags: 0

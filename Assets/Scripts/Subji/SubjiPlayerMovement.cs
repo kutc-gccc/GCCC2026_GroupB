@@ -59,9 +59,9 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Tooltip("グラデーション画像の解像度。高いほど滑らかですが生成負荷が増えます")]
     [Range(64, 512)] public int darknessTextureResolution = 256;
 
-    [Header("スロット2のライト")]
+    [Header("スロット1のライト")]
     [Tooltip("左から数えたライトのスロット番号")]
-    [Min(1)] public int lightSlotNumber = 2;
+    [Min(1)] public int lightSlotNumber = 1;
     [Tooltip("敵の正面視野と同じ、ライトの照射角度")]
     [Range(1f, 180f)] public float lightViewAngle = 45f;
     [Tooltip("敵の正面視野と同じ、ライトの照射距離")]
@@ -134,6 +134,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     public bool IsInInterior => interiorMovementArea != null;
     public bool IsStandalonePreview { get; set; }
+    public bool IsLightOn => isLightOn;
 
     public void SetInteriorArea(SubjiMovementArea2D area)
     {
@@ -225,12 +226,14 @@ public class SubjiPlayerMovement : MonoBehaviour
             roadMap.RegisterPlayer(transform);
             transform.position = roadMap.GetClosestPointOnRoad(transform.position,
                 playerRenderer != null ? playerRenderer.bounds.extents : Vector2.zero);
-            CreateEnemy();
+            if (!JikkenCommentStream.IsTutorialScene)
+                CreateEnemy();
             if (GetComponent<SubjiGameClearGoal>() == null)
                 gameObject.AddComponent<SubjiGameClearGoal>();
         }
         CreateSpeedBoostGauge();
-        CreateDarknessOverlay();
+        if (!JikkenCommentStream.IsTutorialScene)
+            CreateDarknessOverlay();
 
         moveAction = new InputAction("Move", InputActionType.Value);
         moveAction.AddCompositeBinding("2DVector")
@@ -266,7 +269,7 @@ public class SubjiPlayerMovement : MonoBehaviour
         movement = IsHidden || interactionMovementLocked
             ? Vector2.zero
             : moveAction.ReadValue<Vector2>().normalized;
-        if (!IsInInterior && Keyboard.current != null &&
+        if (!JikkenCommentStream.IsTutorialScene && !IsInInterior && Keyboard.current != null &&
             Keyboard.current[nightVisionToggleKey].wasPressedThisFrame)
         {
             enableNightVision = !enableNightVision;
@@ -552,7 +555,8 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void UpdateSlotLight()
     {
-        if (Mouse.current == null)
+        if (Mouse.current == null || interactionMovementLocked ||
+            (roadMap != null && roadMap.MessageScreenOpen) || Time.timeScale <= 0f)
             return;
 
         if (!IsStandalonePreview && itemSlotSelector == null)
@@ -574,7 +578,7 @@ public class SubjiPlayerMovement : MonoBehaviour
             flashlightDirection = direction.normalized;
     }
 
-    void SetLightOn(bool turnOn)
+    public void SetLightOn(bool turnOn)
     {
         isLightOn = turnOn;
         UpdateDarknessMaterial();
@@ -583,7 +587,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     void UpdateDarknessVisibility()
     {
         if (darknessOverlay != null)
-            darknessOverlay.SetActive(enableNightVision || IsInInterior);
+            darknessOverlay.SetActive(!JikkenCommentStream.IsTutorialScene && (enableNightVision || IsInInterior));
     }
 
     void OnDestroy()

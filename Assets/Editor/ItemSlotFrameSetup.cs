@@ -188,15 +188,15 @@ public static class ItemSlotFrameSetup
             .Where(rect => rect.parent == canvasObject.transform)
             .OrderBy(rect => rect.anchoredPosition.x)
             .ToArray();
-        if (slots.Length == 0)
+        if (slots.Length < 2)
             throw new System.InvalidOperationException("アイテムスロットが見つかりません。");
 
-        var oldIcon = slots[0].Find("CommentIcon");
+        var oldIcon = slots[1].Find("CommentIcon");
         if (oldIcon != null)
             Object.DestroyImmediate(oldIcon.gameObject);
 
         var iconObject = new GameObject("CommentIcon", typeof(RectTransform), typeof(Image));
-        iconObject.transform.SetParent(slots[0], false);
+        iconObject.transform.SetParent(slots[1], false);
         var iconRect = iconObject.GetComponent<RectTransform>();
         iconRect.anchorMin = Vector2.zero;
         iconRect.anchorMax = Vector2.one;
@@ -211,7 +211,7 @@ public static class ItemSlotFrameSetup
 
         EditorSceneManager.MarkSceneDirty(canvasObject.scene);
         EditorSceneManager.SaveScene(canvasObject.scene);
-        Debug.Log("一番左のアイテムスロットにコメント画像を追加しました。");
+        Debug.Log("左から2つ目のアイテムスロットにコメント画像を追加しました。");
     }
 
     [MenuItem("Tools/UI/Add Light Item Icon")]
@@ -233,12 +233,12 @@ public static class ItemSlotFrameSetup
         if (slots.Length < 2)
             throw new System.InvalidOperationException("2つ目のアイテムスロットが見つかりません。");
 
-        var oldIcon = slots[1].Find("LightIcon");
+        var oldIcon = slots[0].Find("LightIcon");
         if (oldIcon != null)
             Object.DestroyImmediate(oldIcon.gameObject);
 
         var iconObject = new GameObject("LightIcon", typeof(RectTransform), typeof(Image));
-        iconObject.transform.SetParent(slots[1], false);
+        iconObject.transform.SetParent(slots[0], false);
         var iconRect = iconObject.GetComponent<RectTransform>();
         iconRect.anchorMin = Vector2.zero;
         iconRect.anchorMax = Vector2.one;
@@ -253,7 +253,7 @@ public static class ItemSlotFrameSetup
 
         EditorSceneManager.MarkSceneDirty(canvasObject.scene);
         EditorSceneManager.SaveScene(canvasObject.scene);
-        Debug.Log("左から2つ目のアイテムスロットにライト画像を追加しました。");
+        Debug.Log("一番左のアイテムスロットにライト画像を追加しました。");
     }
 
     [MenuItem("Tools/UI/Setup Drink Item System")]

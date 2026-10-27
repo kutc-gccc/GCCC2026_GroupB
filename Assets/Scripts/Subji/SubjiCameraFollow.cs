@@ -7,6 +7,42 @@ public class SubjiCameraFollow : MonoBehaviour
     [Tooltip("小さいほど素早く、大きいほどゆっくり追従します")]
     [Range(0.01f, 1f)] public float smoothTime = 0.15f;
     private Vector3 followVelocity;
+    private bool focusingAttraction;
+    private Bounds attractionBounds;
+    private Camera viewCamera;
+    private float previousOrthographicSize;
+
+    public void FocusAttraction(Bounds bounds)
+    {
+        if (viewCamera == null) viewCamera = GetComponent<Camera>();
+        if (viewCamera == null || !viewCamera.orthographic) return;
+        if (!focusingAttraction) previousOrthographicSize = viewCamera.orthographicSize;
+        attractionBounds = bounds;
+        focusingAttraction = true;
+        followVelocity = Vector3.zero;
+        UpdateAttractionView();
+    }
+
+    public void ResumePlayerFollow()
+    {
+        if (!focusingAttraction) return;
+        focusingAttraction = false;
+        if (viewCamera != null) viewCamera.orthographicSize = previousOrthographicSize;
+        followVelocity = Vector3.zero;
+    }
+
+    private void UpdateAttractionView()
+    {
+        transform.position = new Vector3(attractionBounds.center.x, attractionBounds.center.y, -10f);
+        viewCamera.orthographicSize = Mathf.Max(previousOrthographicSize,
+            Mathf.Max(attractionBounds.extents.y,
+                attractionBounds.extents.x / Mathf.Max(0.01f, viewCamera.aspect)) * 1.15f);
+    }
+
+    private void OnDisable()
+    {
+        ResumePlayerFollow();
+    }
 
     public void SnapToPlayer()
     {
@@ -18,6 +54,11 @@ public class SubjiCameraFollow : MonoBehaviour
 
     void LateUpdate()
     {
+        if (focusingAttraction)
+        {
+            UpdateAttractionView();
+            return;
+        }
         if (player == null)
             return;
 

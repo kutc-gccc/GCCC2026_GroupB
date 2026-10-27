@@ -138,6 +138,7 @@ public partial class JikkenCommentStream : MonoBehaviour
     private GameObject uiRoot;
     private GameObject popupRoot;
     private TextMeshProUGUI popupLabel;
+    private TextMeshProUGUI popupSenderLabel;
     private float popupTimer;
     private RectTransform commentContent;
     private RectTransform taskContent;
@@ -464,10 +465,24 @@ public partial class JikkenCommentStream : MonoBehaviour
         GameObject textObject = CreateTextObject("Popup Comment Text", popupRoot.transform,
             string.Empty, fontSize, popupTextColor);
         RectTransform textRect = textObject.GetComponent<RectTransform>();
-        Stretch(textRect, 0f, 0f, 1f, 1f, 24f);
+        Stretch(textRect, 0.06f, 0.22f, 0.96f, 0.61f, 2f);
         popupLabel = textObject.GetComponent<TextMeshProUGUI>();
+        popupLabel.enableAutoSizing = true;
+        popupLabel.fontSizeMin = 18f;
+        popupLabel.fontSizeMax = fontSize;
         popupLabel.textWrappingMode = TextWrappingModes.Normal;
         popupLabel.raycastTarget = false;
+        GameObject senderObject = CreateTextObject("Popup Sender", popupRoot.transform,
+            string.Empty, fontSize, popupTextColor);
+        popupSenderLabel = senderObject.GetComponent<TextMeshProUGUI>();
+        Stretch(popupSenderLabel.rectTransform, 0.14f, 0.75f, 0.47f, 0.96f, 1f);
+        popupSenderLabel.alignment = TextAlignmentOptions.Midline;
+        popupSenderLabel.enableAutoSizing = true;
+        popupSenderLabel.fontSizeMin = 8f;
+        popupSenderLabel.fontSizeMax = 25f;
+        popupSenderLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        popupSenderLabel.overflowMode = TextOverflowModes.Ellipsis;
+        popupSenderLabel.raycastTarget = false;
         popupRoot.SetActive(false);
     }
 

@@ -795,8 +795,28 @@ public class SubjiPlayerMovement : MonoBehaviour
             : requestedSpawn;
     }
 
+    // CanvasScaler（1920×1080・縦横比0.5）と同じ倍率で旧形式のHUDも描画する。
+    public readonly struct ReferenceGuiScope : IDisposable
+    {
+        private readonly Matrix4x4 previousMatrix;
+        public float Width { get; }
+        public float Height { get; }
+
+        public ReferenceGuiScope(int screenWidth, int screenHeight)
+        {
+            previousMatrix = GUI.matrix;
+            float scale = Mathf.Sqrt(Mathf.Max(1, screenWidth) / 1920f * Mathf.Max(1, screenHeight) / 1080f);
+            Width = screenWidth / scale;
+            Height = screenHeight / scale;
+            GUI.matrix = previousMatrix * Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+        }
+
+        public void Dispose() => GUI.matrix = previousMatrix;
+    }
+
     void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!Application.isPlaying || (roadMap != null && roadMap.MessageScreenOpen))
             return;
 
@@ -807,17 +827,20 @@ public class SubjiPlayerMovement : MonoBehaviour
             coordinateStyle.normal.textColor = Color.white;
         }
 
-        string coordinates = $"X: {transform.position.x:F1}  Y: {transform.position.y:F1}";
+        if (!JikkenCommentStream.IsTutorialScene)
+        {
+            string coordinates = $"X: {transform.position.x:F1}  Y: {transform.position.y:F1}";
 
-        GUI.color = new Color(0f, 0f, 0f, 0.7f);
-        GUI.Box(new Rect(10f, 70f, 210f, 48f), GUIContent.none);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(20f, 77f, 190f, 34f), $"登録者: {SubscriberCount}", coordinateStyle);
+            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            GUI.Box(new Rect(10f, 70f, 210f, 48f), GUIContent.none);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(20f, 77f, 190f, 34f), $"登録者: {SubscriberCount}", coordinateStyle);
 
-        GUI.color = new Color(0f, 0f, 0f, 0.7f);
-        GUI.Box(new Rect(10f, 126f, 275f, 48f), GUIContent.none);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(20f, 133f, 255f, 34f), coordinates, coordinateStyle);
+            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            GUI.Box(new Rect(10f, 126f, 275f, 48f), GUIContent.none);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(20f, 133f, 255f, 34f), coordinates, coordinateStyle);
+        }
 
         if (Time.unscaledTime < taskCompleteMessageUntil)
         {
@@ -832,8 +855,8 @@ public class SubjiPlayerMovement : MonoBehaviour
 
             const float width = 520f;
             const float height = 90f;
-            Rect messageRect = new Rect((Screen.width - width) * 0.5f,
-                (Screen.height - height) * 0.5f, width, height);
+            Rect messageRect = new Rect((referenceGui.Width - width) * 0.5f,
+                (referenceGui.Height - height) * 0.5f, width, height);
             GUI.color = Color.white;
             GUI.Label(messageRect,
                 $"タスク完了  +{lastTaskSubscriberReward}人", taskCompleteStyle);

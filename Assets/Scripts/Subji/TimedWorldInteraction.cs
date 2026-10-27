@@ -75,13 +75,14 @@ public sealed class TimedWorldInteraction : MonoBehaviour
 
     private void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!IsRunning)
             return;
 
         const float width = 300f;
         const float height = 24f;
-        Rect background = new Rect((Screen.width - width) * 0.5f,
-            Screen.height * 0.72f, width, height);
+        Rect background = new Rect((referenceGui.Width - width) * 0.5f,
+            referenceGui.Height * 0.72f, width, height);
         GUI.color = new Color(0f, 0f, 0f, 0.75f);
         GUI.DrawTexture(background, Texture2D.whiteTexture);
         GUI.color = new Color(0.25f, 0.85f, 1f, 1f);

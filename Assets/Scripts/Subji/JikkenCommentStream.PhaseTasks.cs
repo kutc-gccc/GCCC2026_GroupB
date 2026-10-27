@@ -20,7 +20,12 @@ public partial class JikkenCommentStream
     public Transform signLocation;
     public Transform freeFallBoardingPoint;
     public Transform freeFallExitPoint;
+    [InspectorName("フリーフォールのアニメーション")]
+    public Animator freeFallAnimator;
+    public Transform freeFallSeat;
     public Transform trainWhistlePoint;
+    [InspectorName("汽笛のアニメーション")]
+    public Animator trainWhistleAnimator;
     public SubjiScenePortal hauntedHouseEntrance;
     [Min(0.01f)] public float vendingSeconds = 1f;
     [Min(0.01f)] public float bushSeconds = 0.5f;
@@ -28,6 +33,8 @@ public partial class JikkenCommentStream
     [Min(0.01f)] public float whistleSeconds = 4f;
     [Min(0f)] public float whistleAlertSeconds = 2f;
     [Min(0.1f)] public float phaseInteractionRange = 3f;
+    [InspectorName("汽車の操作範囲倍率")]
+    [Min(0.1f)] public float trainInteractionRangeMultiplier = 3f;
     [Min(0.1f)] public float whistleAlertRadius = 30f;
     public AudioClip whistleClip;
     [Range(0f, 1f)] public float whistleVolume = 1f;
@@ -55,6 +62,8 @@ public partial class JikkenCommentStream
     private bool whistleRunning;
     private bool whistleAlerted;
     private bool ridingFreeFall;
+    private Vector3 freeFallSeatRestPosition;
+    private SubjiCameraFollow freeFallCamera;
     private GUIStyle phaseHintStyle;
 
     private void InitializePhaseTasks()
@@ -68,6 +77,7 @@ public partial class JikkenCommentStream
             playerMovement.gameObject.AddComponent<TimedWorldInteraction>();
         phaseInteraction.Ended += OnPhaseInteractionEnded;
         AlignFreeFallInteractionPoints();
+        if (freeFallSeat != null) freeFallSeatRestPosition = freeFallSeat.localPosition;
         if (drinkItemController != null)
             drinkItemController.SetPurchaseDuration(vendingSeconds);
         foreach (BushHideSpot2D bush in FindObjectsByType<BushHideSpot2D>(FindObjectsSortMode.None))
@@ -146,6 +156,7 @@ public partial class JikkenCommentStream
             return;
         }
         UpdatePhaseIntro();
+        UpdateWhistleAnimation();
         if (whistleRunning && phaseInteraction.IsRunning && !whistleAlerted &&
             phaseInteraction.Elapsed >= whistleAlertSeconds)
         {
@@ -160,7 +171,8 @@ public partial class JikkenCommentStream
         if (id != 5 && id != 6 && id != 8) return;
         Transform target = GetPhaseTarget(id);
         if (target == null) return;
-        bool inRange = Vector2.Distance(player.position, target.position) <= phaseInteractionRange;
+        float interactionRange = phaseInteractionRange * (id == 8 ? trainInteractionRangeMultiplier : 1f);
+        bool inRange = Vector2.Distance(player.position, target.position) <= interactionRange;
         if (!inRange)
         {
             if (qteIndex >= 0) playerMovement.SetInteractionMovementLocked(false);
@@ -179,6 +191,25 @@ public partial class JikkenCommentStream
         {
             if (!phaseInteraction.Begin(freeFallSeconds, CompleteFreeFall, false)) return;
             ridingFreeFall = true;
+            if (freeFallAnimator != null)
+            {
+                var clips = freeFallAnimator.runtimeAnimatorController != null
+                    ? freeFallAnimator.runtimeAnimatorController.animationClips : Array.Empty<AnimationClip>();
+                freeFallAnimator.speed = clips.Length > 0 ? clips[0].length / Mathf.Max(0.01f, freeFallSeconds) : 1f;
+                freeFallAnimator.enabled = true;
+                freeFallAnimator.Play(0, 0, 0f);
+                freeFallAnimator.Update(0f);
+                var attractionRenderer = freeFallAnimator.GetComponent<SpriteRenderer>();
+                var mainCamera = Camera.main;
+                if (attractionRenderer != null && mainCamera != null)
+                {
+                    freeFallCamera = mainCamera.GetComponent<SubjiCameraFollow>();
+                    Bounds bounds = attractionRenderer.bounds;
+                    if (freeFallSeat != null && freeFallSeat.TryGetComponent<SpriteRenderer>(out var seatRenderer))
+                        bounds.Encapsulate(seatRenderer.bounds);
+                    freeFallCamera?.FocusAttraction(bounds);
+                }
+            }
             // 共通の隠れ状態により接触判定も無効化。周囲の敵は乗車中だけ停止する。
             playerMovement.SetHidden(true);
             foreach (var enemy in phaseEnemies)
@@ -193,6 +224,30 @@ public partial class JikkenCommentStream
             whistleAlerted = false;
             whistleRunning = true;
             whistleSource.Play();
+            UpdateWhistleAnimation();
+        }
+    }
+
+    private void UpdateWhistleAnimation()
+    {
+        if (trainWhistleAnimator == null) return;
+        bool playing = whistleRunning && phaseInteraction.IsRunning && !isOpen &&
+            !playerMovement.IsHidden && Keyboard.current != null && Keyboard.current.eKey.isPressed;
+        if (trainWhistleAnimator.enabled == playing) return;
+        if (playing)
+        {
+            trainWhistleAnimator.enabled = true;
+            trainWhistleAnimator.Rebind();
+            trainWhistleAnimator.Play(0, 0, 0f);
+            trainWhistleAnimator.Update(0f);
+        }
+        else
+        {
+            trainWhistleAnimator.enabled = false;
+            // クリップは子の煙だけを操作する。停止時は残っている煙も消す。
+            foreach (Transform smoke in trainWhistleAnimator.transform)
+                if (smoke.name.StartsWith("Gemini_Generated_Image_d8v20dd8v20dd8v2_0", StringComparison.Ordinal))
+                    smoke.gameObject.SetActive(false);
         }
     }
 
@@ -389,10 +444,15 @@ public partial class JikkenCommentStream
     private void OnPhaseInteractionEnded()
     {
         whistleRunning = false;
+        UpdateWhistleAnimation();
         if (whistleSource != null) whistleSource.Stop();
         if (ridingFreeFall)
         {
             ridingFreeFall = false;
+            if (freeFallCamera != null) freeFallCamera.ResumePlayerFollow();
+            freeFallCamera = null;
+            if (freeFallAnimator != null) freeFallAnimator.enabled = false;
+            if (freeFallSeat != null) freeFallSeat.localPosition = freeFallSeatRestPosition;
             playerMovement.SetHidden(false);
             foreach (var enemy in ridingPausedEnemies) if (enemy != null) enemy.enabled = true;
             ridingPausedEnemies.Clear();
@@ -429,12 +489,13 @@ public partial class JikkenCommentStream
 
     private void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!Application.isPlaying || !enablePhaseTwoTasks || selectedTask == null || isOpen || qteIndex < 0) return;
         var arrows = new List<string>();
         foreach (Key key in signSequence)
             arrows.Add(key == Key.UpArrow ? "↑" : key == Key.DownArrow ? "↓" : key == Key.LeftArrow ? "←" : key == Key.RightArrow ? "→" : key.ToString());
         phaseHintStyle ??= new GUIStyle(GUI.skin.box) { fontSize = 24, alignment = TextAnchor.MiddleCenter };
-        GUI.Box(new Rect((Screen.width - 600f) * 0.5f, Screen.height * 0.65f, 600f, 70f),
+        GUI.Box(new Rect((referenceGui.Width - 600f) * 0.5f, referenceGui.Height * 0.65f, 600f, 70f),
             "サイン：" + string.Join("  ", arrows) + $"\n{qteIndex}/{signSequence.Length}  誤入力で最初から", phaseHintStyle);
     }
 }

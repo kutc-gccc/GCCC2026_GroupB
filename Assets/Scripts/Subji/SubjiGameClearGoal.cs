@@ -110,6 +110,7 @@ public class SubjiGameClearGoal : MonoBehaviour
 
     private void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!isClear && !isGameOver)
             return;
 
@@ -127,11 +128,11 @@ public class SubjiGameClearGoal : MonoBehaviour
         }
 
         GUI.color = new Color(0f, 0f, 0f, 0.82f);
-        GUI.Box(new Rect(0f, 0f, Screen.width, Screen.height), GUIContent.none);
+        GUI.Box(new Rect(0f, 0f, referenceGui.Width, referenceGui.Height), GUIContent.none);
         GUI.color = Color.white;
 
-        float centerX = Screen.width * 0.5f;
-        float centerY = Screen.height * 0.5f;
+        float centerX = referenceGui.Width * 0.5f;
+        float centerY = referenceGui.Height * 0.5f;
         GUI.Label(new Rect(centerX - 240f, centerY - 130f, 480f, 100f),
             isGameOver ? "GAME OVER" : "CLEAR", clearStyle);
 

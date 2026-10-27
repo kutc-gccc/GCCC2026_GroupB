@@ -669,13 +669,14 @@ public class SubjiRoadMap : MonoBehaviour
 
     private void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!Application.isPlaying || player == null || MessageScreenOpen)
             return;
 
         // IMGUI内では小さいdepthほど手前に描画される。
         GUI.depth = -1000;
-        float mapSize = Mathf.Min(minimapSize, Screen.width * 0.35f, Screen.height * 0.35f);
-        Rect map = new Rect(Screen.width - mapSize - minimapMargin, minimapMargin, mapSize, mapSize);
+        float mapSize = Mathf.Min(minimapSize, referenceGui.Width * 0.35f, referenceGui.Height * 0.35f);
+        Rect map = new Rect(referenceGui.Width - mapSize - minimapMargin, minimapMargin, mapSize, mapSize);
 
         if (!showMinimap)
         {

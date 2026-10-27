@@ -46,6 +46,7 @@ public partial class JikkenCommentStream
         new("左のタスクを左クリックすると受注できるよ"),
         new("Q4. タスクを受注してみよう"),
         new("右上の×で画面を閉じ、マウスホイールでライトを選んで左クリックしよう"),
+        new("本番は真っ暗だからライトで警備員を見つけて上手に逃げよう", 3f),
         new("これで操作説明は終わり。配信の準備をしておこう")
     };
     [Min(0f)] public float tutorialOkSeconds = 3f;
@@ -102,8 +103,15 @@ public partial class JikkenCommentStream
         tutorialBanner.enableAutoSizing = true;
         tutorialBanner.fontSizeMin = 18f;
         tutorialBanner.fontSizeMax = fontSize;
-        tutorialSkipLabel = CreateTutorialLabel(root.transform, "Skip", new Vector2(0, -320), new Vector2(1000, 60), 24);
+        tutorialSkipLabel = CreateTutorialLabel(root.transform, "Skip", new Vector2(0, -320), new Vector2(1000, 80), 36);
         tutorialSkipLabel.text = "Space：コメントを1つ飛ばす";
+        tutorialSkipLabel.color = Color.white;
+        tutorialSkipLabel.fontStyle = FontStyles.Bold;
+        tutorialSkipLabel.outlineColor = Color.black;
+        tutorialSkipLabel.outlineWidth = 0.5f;
+        tutorialSkipLabel.fontMaterial.EnableKeyword("OUTLINE_ON");
+        tutorialSkipLabel.extraPadding = true;
+        tutorialSkipLabel.UpdateMeshPadding();
         tutorialOkLabel = CreateTutorialLabel(root.transform, "OK", Vector2.zero, new Vector2(500, 150), 90);
         tutorialOkLabel.color = tutorialOkColor;
         tutorialOkLabel.fontStyle = FontStyles.Bold;
@@ -145,7 +153,8 @@ public partial class JikkenCommentStream
         bool question = step == 3 || step == 6 || step == 9 || step == 12;
         var color = question ? tutorialQuestionColor : popupTextColor;
         tutorialBanner.color = color;
-        tutorialBanner.text = comment.sender + "\n" + comment.text;
+        popupSenderLabel.text = comment.sender;
+        tutorialBanner.text = comment.text;
         AddTutorialHistoryComment(comment.text, question ? tutorialQuestionColor : normalTextColor);
         if (step == 10 && tutorialLightEntry == null)
         {
@@ -183,7 +192,7 @@ public partial class JikkenCommentStream
             }
             roadMap?.ClearActiveTaskText();
         }
-        if (dedicatedStep < 14)
+        if (dedicatedStep < tutorialComments.Length - 1)
         {
             EnterDedicatedStep(dedicatedStep + 1);
             return;

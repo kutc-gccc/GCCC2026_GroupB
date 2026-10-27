@@ -206,6 +206,7 @@ public sealed class SubjiScenePortal : MonoBehaviour
 
     private void OnGUI()
     {
+        using var referenceGui = new SubjiPlayerMovement.ReferenceGuiScope(Screen.width, Screen.height);
         if (!CanEnter)
             return;
         hintStyle ??= new GUIStyle(GUI.skin.box)
@@ -213,7 +214,7 @@ public sealed class SubjiScenePortal : MonoBehaviour
             alignment = TextAnchor.MiddleCenter,
             fontSize = 22
         };
-        GUI.Box(new Rect((Screen.width - 340f) * 0.5f, Screen.height * 0.8f, 340f, 44f),
+        GUI.Box(new Rect((referenceGui.Width - 340f) * 0.5f, referenceGui.Height * 0.8f, 340f, 44f),
             "E：お化け屋敷に入る", hintStyle);
     }
 

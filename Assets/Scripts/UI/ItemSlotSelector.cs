@@ -23,12 +23,15 @@ public sealed class ItemSlotSelector : MonoBehaviour
     private readonly List<RectTransform> slots = new();
     private int selectedIndex;
     private int knownChildCount = -1;
+    private DrinkItemController drinkController;
 
     public int SelectedIndex => selectedIndex;
+    public IReadOnlyList<RectTransform> Slots => slots;
     public event Action<int> SelectedSlotClicked;
 
     private void OnEnable()
     {
+        drinkController = GetComponent<DrinkItemController>();
         if (commentStream == null)
             commentStream = FindFirstObjectByType<JikkenCommentStream>();
 
@@ -56,6 +59,9 @@ public sealed class ItemSlotSelector : MonoBehaviour
 
         if (Mouse.current.leftButton.wasPressedThisFrame)
         {
+            if (drinkController != null && drinkController.isActiveAndEnabled &&
+                drinkController.TryUseDrink(slots[selectedIndex]))
+                return;
             SelectedSlotClicked?.Invoke(selectedIndex);
 
             if (selectedIndex == commentSlotIndex)

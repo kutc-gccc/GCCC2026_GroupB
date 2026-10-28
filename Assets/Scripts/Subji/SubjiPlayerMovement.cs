@@ -35,11 +35,9 @@ public class SubjiPlayerMovement : MonoBehaviour
     public Color speedBoostGaugeBackgroundColor = new Color(0f, 0f, 0f, 0.75f);
 
     [Header("夜の視野（実験機能）")]
-    [Tooltip("ゲーム開始時から暗くするか。プレイ中は切り替えキーで変更できます")]
+    [Tooltip("ゲーム開始時から暗くするか")]
     public bool enableNightVision = true;
 
-    [Tooltip("夜の暗さをON/OFFするキー")]
-    public Key nightVisionToggleKey = Key.P;
 
     [Tooltip("ライト消灯中の最小視野半径")]
     [Min(0.1f)] public float playerVisionRadius = 2f;
@@ -66,6 +64,10 @@ public class SubjiPlayerMovement : MonoBehaviour
     [Range(1f, 180f)] public float lightViewAngle = 45f;
     [Tooltip("敵の正面視野と同じ、ライトの照射距離")]
     [Min(0.1f)] public float lightViewDistance = 7.5f;
+    [Tooltip("通常ライトの周縁部をぼかす角度（度）")]
+    [Range(0f, 45f)] public float lightEdgeAngle = 3f;
+    [Tooltip("通常ライトの周縁部の減衰の強さ")]
+    [Min(0.01f)] public float lightDropoff = 15f;
 
     [Header("敵の初期設定")]
     [Tooltip("マップ中央から見た敵の希望出現位置。実際には最寄りの道路上へ補正されます")]
@@ -135,6 +137,7 @@ public class SubjiPlayerMovement : MonoBehaviour
     public bool IsInInterior => interiorMovementArea != null;
     public bool IsStandalonePreview { get; set; }
     public bool IsLightOn => isLightOn;
+    public bool IsTaskCompleteMessageVisible => Time.unscaledTime < taskCompleteMessageUntil;
 
     public void SetInteriorArea(SubjiMovementArea2D area)
     {
@@ -269,12 +272,6 @@ public class SubjiPlayerMovement : MonoBehaviour
         movement = IsHidden || interactionMovementLocked
             ? Vector2.zero
             : moveAction.ReadValue<Vector2>().normalized;
-        if (!JikkenCommentStream.IsTutorialScene && !IsInInterior && Keyboard.current != null &&
-            Keyboard.current[nightVisionToggleKey].wasPressedThisFrame)
-        {
-            enableNightVision = !enableNightVision;
-            UpdateDarknessVisibility();
-        }
         UpdateSlotLight();
         UpdateDarknessMaterial();
         UpdateSpeedBoost();
@@ -374,6 +371,8 @@ public class SubjiPlayerMovement : MonoBehaviour
             ActiveLightViewDistance, Mathf.Cos(ActiveLightViewAngle * 0.5f * Mathf.Deg2Rad), 0f));
         darknessMaterial.SetVector("_FlashlightDirection",
             new Vector4(flashlightDirection.x, flashlightDirection.y, 0f, 0f));
+        darknessMaterial.SetVector("_FlashlightEdgeData", new Vector4(
+            interiorStage == null ? lightEdgeAngle * Mathf.Deg2Rad : 0f, lightDropoff, 0f, 0f));
         UpdateLightOcclusion();
 
         if (lastPlacedLightRevision == SubjiPlacedLight.Revision)
@@ -555,7 +554,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
     void UpdateSlotLight()
     {
-        if (Mouse.current == null || interactionMovementLocked ||
+        if (Mouse.current == null ||
             (roadMap != null && roadMap.MessageScreenOpen) || Time.timeScale <= 0f)
             return;
 
@@ -766,6 +765,20 @@ public class SubjiPlayerMovement : MonoBehaviour
         const string enemyName = "Enemy";
         GameObject enemy = GameObject.Find(enemyName);
 
+        // Phase tasks keep the placed enemies inactive until ID1 is completed.
+        // Reuse that enemy and its parent scale instead of creating a smaller root object.
+        if (enemy == null)
+        {
+            foreach (SubjiEnemyChase existing in FindObjectsByType<SubjiEnemyChase>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (existing.gameObject.scene != gameObject.scene || existing.name != enemyName)
+                    continue;
+                enemy = existing.gameObject;
+                break;
+            }
+        }
+
         if (enemy == null)
             enemy = new GameObject(enemyName);
 
@@ -787,6 +800,7 @@ public class SubjiPlayerMovement : MonoBehaviour
 
         enemyChase.player = transform;
         enemyChase.roadMap = roadMap;
+        enemyChase.ApplyAppearanceAndCollider();
 
         Vector2 enemyExtents = enemyRenderer.bounds.extents;
         Vector2 requestedSpawn = fieldCenter + enemySpawnOffset;

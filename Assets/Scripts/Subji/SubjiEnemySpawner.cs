@@ -76,8 +76,19 @@ public class SubjiEnemySpawner : MonoBehaviour
 
     private void SpawnEnemy()
     {
-        Vector2 spawnPosition = GetSpawnPosition();
+        SpawnEnemyAt(GetSpawnPosition());
+    }
+
+    // Task-triggered spawning shares the normal enemy setup even while the timer is disabled.
+    public SubjiEnemyChase SpawnEnemyAt(Vector2 spawnPosition)
+    {
+        if (roadMap == null) roadMap = GetComponent<SubjiRoadMap>();
+        if (player == null) player = FindFirstObjectByType<SubjiPlayerMovement>()?.transform;
+        if (enemyTemplate == null) enemyTemplate = FindFirstObjectByType<SubjiEnemyChase>();
+        if (roadMap == null || player == null || enemyTemplate == null) return null;
         GameObject enemy = new GameObject($"Enemy {++spawnedCount}");
+        // Keep the template's parent scaling as well as the shared local Scale of 1.5.
+        enemy.transform.SetParent(enemyTemplate.transform.parent, false);
         SpriteRenderer sourceRenderer = enemyTemplate.GetComponent<SpriteRenderer>();
         SpriteRenderer renderer = enemy.AddComponent<SpriteRenderer>();
         if (sourceRenderer != null)
@@ -86,13 +97,12 @@ public class SubjiEnemySpawner : MonoBehaviour
             renderer.sharedMaterial = sourceRenderer.sharedMaterial;
             renderer.color = sourceRenderer.color;
             renderer.sortingOrder = sourceRenderer.sortingOrder;
-            enemy.transform.localScale = enemyTemplate.transform.localScale;
         }
 
         SubjiEnemyChase chase = enemy.AddComponent<SubjiEnemyChase>();
         chase.movementType = enemyTemplate.movementType;
         chase.spriteResourcePath = enemyTemplate.spriteResourcePath;
-        chase.visualScale = enemyTemplate.visualScale;
+        chase.visualScale = new Vector2(1.5f, 1.5f);
         chase.collisionSize = enemyTemplate.collisionSize;
         chase.collisionOffset = enemyTemplate.collisionOffset;
         chase.patrolSpeed = enemyTemplate.patrolSpeed;
@@ -101,6 +111,8 @@ public class SubjiEnemySpawner : MonoBehaviour
         chase.movingDetectionRadius = enemyTemplate.movingDetectionRadius;
         chase.idleDetectionRadius = enemyTemplate.idleDetectionRadius;
         chase.chaseSpeed = enemyTemplate.chaseSpeed;
+        chase.matchPlayerMoveSpeed = enemyTemplate.matchPlayerMoveSpeed;
+        chase.useRadialDetection = enemyTemplate.useRadialDetection;
         chase.chaseMemorySeconds = enemyTemplate.chaseMemorySeconds;
         chase.circleWidth = enemyTemplate.circleWidth;
         chase.useTemporaryVisionCone = enemyTemplate.useTemporaryVisionCone;
@@ -123,6 +135,7 @@ public class SubjiEnemySpawner : MonoBehaviour
 
         Vector2 extents = renderer.bounds.extents;
         enemy.transform.position = roadMap.GetClosestPointOnRoad(spawnPosition, extents);
+        return chase;
     }
 
     private Vector2 GetSpawnPosition()

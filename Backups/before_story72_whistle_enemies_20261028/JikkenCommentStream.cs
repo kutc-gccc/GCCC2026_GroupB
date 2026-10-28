@@ -1,0 +1,1643 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
+
+[ExecuteAlways]
+public partial class JikkenCommentStream : MonoBehaviour
+{
+    private enum TaskCompletionType
+    {
+        Destination,
+        VendingPurchase,
+        BushHide,
+        CoffeeCupLight,
+        CastleLight,
+        EscapeGoal,
+        PhaseTask,
+        TutorialLight
+    }
+
+    [Header("自動生成")]
+    [Tooltip("オンにすると、プレイ中にタスク付きコメントと通常コメントを自動生成します")]
+    public bool autoGenerateComments;
+
+    [Serializable]
+    public class TaskComment
+    {
+        public string commentText;
+        [TextArea] public string taskText;
+    }
+
+    private class AcceptedTask
+    {
+        public Vector2 destination;
+        public string displayText;
+        public bool isTutorialTask;
+        public RectTransform taskView;
+        public RectTransform sourceComment;
+        public TaskCompletionType completionType;
+        public int subscriberReward = 100;
+        public int designTaskId;
+    }
+
+    [Header("通常コメント")]
+    public string[] words = { "ああああ", "いいいいい", "ううううう" };
+
+    [Header("タスク付きコメント")]
+    public TaskComment[] taskComments =
+    {
+        new TaskComment
+        {
+            commentText = "◆ 座標のX:2、Y:2を調査して！",
+            taskText = "タスク：指定地点へ移動\nX:2、Y:2のところへ進め"
+        }
+    };
+    [Range(0f, 100f)] public float taskCommentChance = 25f;
+
+    [Header("BGM")]
+    [Tooltip("ステージ中にループ再生するBGM。未設定時は共通BGMを使用します")]
+    public AudioClip backgroundMusic;
+    [Range(0f, 1f)] public float backgroundMusicVolume = 0.7f;
+    [Tooltip("敵に追跡されている間にループ再生するBGM。未設定時は共通追跡BGMを使用します")]
+    public AudioClip enemyChaseMusic;
+    [Range(0f, 1f)] public float enemyChaseMusicVolume = 0.7f;
+
+    [Header("コメント発生音")]
+    [Tooltip("コメント欄へ新しいコメントが追加された瞬間に再生します")]
+    public AudioClip commentAppearedSound;
+    [Range(0f, 1f)] public float commentAppearedSoundVolume = 1f;
+
+    [Header("タスク選択音")]
+    [Tooltip("タスクを選択して受諾した瞬間に再生します")]
+    public AudioClip taskSelectedSound;
+    [Range(0f, 1f)] public float taskSelectedSoundVolume = 1f;
+
+    [Header("タスク完了音")]
+    [Tooltip("選択中のタスクを完了した瞬間に再生します")]
+    public AudioClip taskCompletedSound;
+    [Range(0f, 1f)] public float taskCompletedSoundVolume = 1f;
+
+    [Header("タスク目的地")]
+    [Tooltip("目的地へこの距離まで近づくとタスク完了になります")]
+    [Min(0.1f)] public float taskArrivalDistance = 1f;
+
+    [Header("導入チュートリアル")]
+    [Tooltip("コメント表のID 1～4をゲーム開始時に順番に再生します")]
+    public bool playIntroTutorial = true;
+    [Tooltip("ID1を表示してからID2へ進むまでの秒数")]
+    [Min(0f)] public float introFirstMessageDuration = 4f;
+    [InspectorName("タスク案内を繰り返す間隔（秒）")]
+    [Min(0.5f)] public float tutorialMessageInterval = 4f;
+
+    [Header("ID5～7の表示タイミング")]
+    [Tooltip("ID5を表示してからID6を表示するまでの秒数")]
+    [Min(0f)] public float id5To6Delay = 2f;
+    [Tooltip("ID6を表示してからID7を表示するまでの秒数")]
+    [Min(0f)] public float id6To7Delay = 2f;
+
+    [Header("表示設定")]
+    public TMP_FontAsset fontAsset;
+    [Min(0.05f)] public float spawnInterval = 1f;
+    [Min(1)] public int maximumComments = 8;
+    [Min(1f)] public float fontSize = 32f;
+    [Min(1f)] public float commentHeight = 58f;
+    public Color normalTextColor = Color.white;
+    public Color taskTextColor = new Color(1f, 0.25f, 0.25f, 1f);
+    public Color panelColor = new Color(0.03f, 0.32f, 0.45f, 1f);
+
+    [Header("発生コメント表示")]
+    [Min(0.1f)] public float popupDuration = 3f;
+    public Vector2 popupSize = new Vector2(650f, 130f);
+    public Vector2 popupPosition = new Vector2(0f, -8f);
+    public Color popupTextColor = Color.black;
+
+    [Header("枠のレイアウト")]
+    [Tooltip("画面全体の端からの余白（px）")]
+    [Min(0f)] public float screenMargin = 8f;
+    [Tooltip("右のコメント枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
+    public Rect commentPanelRect = new Rect(0.51f, 0.02f, 0.475f, 0.96f);
+    [Tooltip("左のタスク枠。X/Y=左下位置、W/H=幅と高さ（0〜1）")]
+    public Rect taskPanelRect = new Rect(0.015f, 0.02f, 0.475f, 0.96f);
+    [Tooltip("枠内側の文字余白（px）")]
+    [Min(0f)] public float panelContentPadding = 28f;
+
+    [Header("編集画面のプレビュ位置")]
+    [Tooltip("再生していない時のUI配置座標。ゲーム本体から離して置けます")]
+    public Vector3 editorPreviewPosition = new Vector3(75f, 0f, 0f);
+    [Tooltip("編集時プレビュの縮小率")]
+    [Min(0.0001f)] public float editorPreviewScale = 0.01f;
+
+    private readonly List<RectTransform> comments = new List<RectTransform>();
+    private readonly List<RectTransform> taskEntries = new List<RectTransform>();
+    private GameObject uiRoot;
+    private GameObject popupRoot;
+    private TextMeshProUGUI popupLabel;
+    private TextMeshProUGUI popupSenderLabel;
+    private Image popupFrameImage;
+    private Sprite normalCommentFrame;
+    private Sprite taskCommentFrame;
+    private float popupTimer;
+    private bool popupPersistent;
+    private RectTransform commentContent;
+    private RectTransform taskContent;
+    private float timer;
+    private bool isOpen;
+    private SubjiRoadMap roadMap;
+    private Transform player;
+    private SubjiPlayerMovement playerMovement;
+    private AcceptedTask selectedTask;
+    private int tutorialStep;
+    private float tutorialTimer;
+    private bool tutorialTaskCommentCreated;
+    private bool tutorialStep3CommentCreated;
+    private GameObject taskArrivalTriggerObject;
+    private static Sprite taskDestinationMarkerSprite;
+    private DrinkItemController drinkItemController;
+    private CoffeeCupLightInteraction coffeeCupInteraction;
+    private CoffeeCupLightInteraction castleInteraction;
+    private SubjiGameClearGoal gameClearGoal;
+    private bool postTutorialTasksStarted;
+    private int postTutorialSequenceStep;
+    private float postTutorialSequenceTimer;
+    private string activeWorldTaskGuidance;
+    private float worldTaskGuidanceTimer;
+    private bool vendingTutorialCompleted;
+    private bool bushTutorialCompleted;
+    private bool greenGuardSpawned;
+    private bool coffeeCupTaskCreated;
+    private bool castleTaskCreated;
+    private AudioSource backgroundMusicSource;
+    private AudioSource commentAppearedAudioSource;
+    private AudioSource taskSelectedAudioSource;
+    private AudioSource taskCompletedAudioSource;
+
+    [Header("ID6・7完了後の監視敵")]
+    [Tooltip("配下にシーン配置した監視敵を置きます。複製した敵も両タスク完了時にまとめて有効化します")]
+    [SerializeField] private GameObject greenGuardContainer;
+
+    private void Awake()
+    {
+        if (fontAsset != null)
+            fontAsset.isMultiAtlasTexturesEnabled = true;
+
+        roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+        if (playerMovement != null)
+            player = playerMovement.transform;
+        EnsureUiExists(false);
+        if (Application.isPlaying)
+        {
+            StartBackgroundMusic();
+            ConfigureCommentAppearedSound();
+            ConfigureTaskSelectedSound();
+            ConfigureTaskCompletedSound();
+            uiRoot.SetActive(false);
+            CreatePopupUi();
+            if (IsTutorialScene)
+                BeginDedicatedTutorial();
+            else
+                SubscribeToWorldTasks();
+            if (!IsTutorialScene && enablePhaseTwoTasks)
+                InitializePhaseTasks();
+            else if (!IsTutorialScene && playIntroTutorial)
+                BeginIntroTutorial();
+        }
+    }
+
+    private void StartBackgroundMusic()
+    {
+        if (backgroundMusic == null)
+            backgroundMusic = Resources.Load<AudioClip>("Audio/pumpkin_house_bgm");
+        if (backgroundMusic == null)
+            return;
+
+        backgroundMusicSource = gameObject.AddComponent<AudioSource>();
+        backgroundMusicSource.clip = backgroundMusic;
+        backgroundMusicSource.volume = backgroundMusicVolume;
+        backgroundMusicSource.loop = true;
+        backgroundMusicSource.playOnAwake = false;
+        backgroundMusicSource.spatialBlend = 0f;
+        backgroundMusicSource.Play();
+        SubjiEnemyChase.AnyEnemyChasingChanged += SwitchChaseMusic;
+    }
+
+    private void ConfigureCommentAppearedSound()
+    {
+        if (commentAppearedSound == null)
+            commentAppearedSound = Resources.Load<AudioClip>("Audio/comment_appeared");
+        if (commentAppearedSound == null)
+            return;
+
+        commentAppearedAudioSource = gameObject.AddComponent<AudioSource>();
+        commentAppearedAudioSource.playOnAwake = false;
+        commentAppearedAudioSource.loop = false;
+        commentAppearedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayCommentAppearedSound()
+    {
+        if (commentAppearedAudioSource != null && commentAppearedSound != null)
+        {
+            commentAppearedAudioSource.PlayOneShot(
+                commentAppearedSound, commentAppearedSoundVolume);
+        }
+    }
+
+    private void ConfigureTaskSelectedSound()
+    {
+        if (taskSelectedSound == null)
+            taskSelectedSound = Resources.Load<AudioClip>("Audio/task_selected");
+        if (taskSelectedSound == null)
+            return;
+
+        taskSelectedAudioSource = gameObject.AddComponent<AudioSource>();
+        taskSelectedAudioSource.playOnAwake = false;
+        taskSelectedAudioSource.loop = false;
+        taskSelectedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayTaskSelectedSound()
+    {
+        if (taskSelectedAudioSource != null && taskSelectedSound != null)
+        {
+            taskSelectedAudioSource.PlayOneShot(
+                taskSelectedSound, taskSelectedSoundVolume);
+        }
+    }
+
+    private void ConfigureTaskCompletedSound()
+    {
+        if (taskCompletedSound == null)
+            taskCompletedSound = Resources.Load<AudioClip>("Audio/task_completed");
+        if (taskCompletedSound == null)
+            return;
+
+        taskCompletedAudioSource = gameObject.AddComponent<AudioSource>();
+        taskCompletedAudioSource.playOnAwake = false;
+        taskCompletedAudioSource.loop = false;
+        taskCompletedAudioSource.spatialBlend = 0f;
+    }
+
+    private void PlayTaskCompletedSound()
+    {
+        if (taskCompletedAudioSource != null && taskCompletedSound != null)
+        {
+            taskCompletedAudioSource.PlayOneShot(
+                taskCompletedSound, taskCompletedSoundVolume);
+        }
+    }
+
+    private void SwitchChaseMusic(bool isBeingChased)
+    {
+        if (backgroundMusicSource == null)
+            return;
+
+        if (enemyChaseMusic == null)
+            enemyChaseMusic = Resources.Load<AudioClip>("Audio/enemy_chase_bgm");
+        AudioClip nextClip = isBeingChased ? enemyChaseMusic : backgroundMusic;
+        if (nextClip == null || backgroundMusicSource.clip == nextClip)
+            return;
+
+        backgroundMusicSource.Stop();
+        backgroundMusicSource.clip = nextClip;
+        backgroundMusicSource.volume = isBeingChased
+            ? enemyChaseMusicVolume
+            : backgroundMusicVolume;
+        backgroundMusicSource.Play();
+    }
+
+    private void OnEnable()
+    {
+        if (Application.isPlaying && roadMap != null)
+            roadMap.MessageScreenOpen = isOpen;
+        if (!Application.isPlaying)
+            EnsureUiExists(false);
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (Application.isPlaying || !isActiveAndEnabled)
+            return;
+
+        UnityEditor.EditorApplication.delayCall += RebuildEditorPreview;
+    }
+
+    private void RebuildEditorPreview()
+    {
+        if (this == null || Application.isPlaying || !isActiveAndEnabled)
+            return;
+        // 既存のRectTransformは上書きしない。
+        // Play Modeへの切り替え直前にOnValidateが呼ばれても、
+        // Sceneビューで調整した枠の位置とサイズを保持する。
+        EnsureUiExists(false);
+    }
+#endif
+
+    private void Update()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (IsTutorialScene)
+            UpdateDedicatedTutorial();
+        else if (enablePhaseTwoTasks)
+            UpdatePhaseTasks();
+        else
+        {
+            UpdateIntroTutorial();
+            UpdatePostTutorialSequence();
+        }
+        UpdateWorldTaskGuidance();
+        UpdateTaskSelectionReminder();
+
+        if (isOpen && Mouse.current != null &&
+            Mouse.current.rightButton.wasPressedThisFrame)
+        {
+            CloseCommentScreen();
+        }
+
+        if (!IsTutorialScene && !popupPersistent && popupRoot != null && popupRoot.activeSelf)
+        {
+            if (isOpen)
+            {
+                popupRoot.SetActive(false);
+                popupTimer = 0f;
+            }
+
+            popupTimer -= Time.deltaTime;
+            if (popupTimer <= 0f)
+                popupRoot.SetActive(false);
+        }
+
+        if (autoGenerateComments && !mainStoryIntroRunning)
+        {
+            timer += Time.deltaTime;
+            if (timer >= spawnInterval)
+            {
+                timer = 0f;
+                SpawnComment();
+            }
+        }
+    }
+
+    public void ToggleCommentScreen()
+    {
+        if (uiRoot == null)
+            EnsureUiExists(false);
+
+        isOpen = !isOpen;
+        uiRoot.SetActive(isOpen);
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = isOpen;
+
+        if (!IsTutorialScene && !popupPersistent && isOpen && popupRoot != null)
+        {
+            popupRoot.SetActive(false);
+            popupTimer = 0f;
+        }
+    }
+
+    public void OpenCommentScreen()
+    {
+        if (uiRoot == null)
+            EnsureUiExists(false);
+
+        isOpen = true;
+        uiRoot.SetActive(true);
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = true;
+
+        if (!IsTutorialScene && !popupPersistent && popupRoot != null)
+        {
+            popupRoot.SetActive(false);
+            popupTimer = 0f;
+        }
+    }
+
+    public void CloseCommentScreen()
+    {
+        isOpen = false;
+        if (roadMap != null)
+            roadMap.MessageScreenOpen = false;
+        if (uiRoot != null)
+            uiRoot.SetActive(false);
+    }
+
+    private void CreatePopupUi()
+    {
+        GameObject canvasObject = new GameObject("Comment Popup Canvas", typeof(RectTransform),
+            typeof(Canvas), typeof(CanvasScaler));
+        canvasObject.transform.SetParent(transform, false);
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 110;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        popupRoot = new GameObject("Generated Comment Popup", typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(Image));
+        popupRoot.transform.SetParent(canvasObject.transform, false);
+        RectTransform popupRect = popupRoot.GetComponent<RectTransform>();
+        popupRect.anchorMin = new Vector2(0.5f, 1f);
+        popupRect.anchorMax = new Vector2(0.5f, 1f);
+        popupRect.pivot = new Vector2(0.5f, 1f);
+        popupRect.sizeDelta = popupSize;
+        popupRect.anchoredPosition = popupPosition;
+
+        Sprite[] popupSprites = Resources.LoadAll<Sprite>("comment");
+        Image image = popupRoot.GetComponent<Image>();
+        popupFrameImage = image;
+        Sprite[] taskSprites = Resources.LoadAll<Sprite>("taskcomment");
+        taskCommentFrame = taskSprites.Length > 0 ? taskSprites[0] : null;
+        if (popupSprites.Length > 0)
+        {
+            image.sprite = popupSprites[0];
+            image.type = Image.Type.Sliced;
+            image.preserveAspect = false;
+        }
+        else
+        {
+            image.color = new Color(0f, 0f, 0f, 0.75f);
+        }
+
+        normalCommentFrame = image.sprite;
+        GameObject textObject = CreateTextObject("Popup Comment Text", popupRoot.transform,
+            string.Empty, fontSize, popupTextColor);
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        Stretch(textRect, 0.06f, 0.22f, 0.96f, 0.61f, 2f);
+        popupLabel = textObject.GetComponent<TextMeshProUGUI>();
+        popupLabel.enableAutoSizing = true;
+        popupLabel.fontSizeMin = 18f;
+        popupLabel.fontSizeMax = fontSize;
+        popupLabel.textWrappingMode = TextWrappingModes.Normal;
+        popupLabel.raycastTarget = false;
+        GameObject senderObject = CreateTextObject("Popup Sender", popupRoot.transform,
+            string.Empty, fontSize, popupTextColor);
+        popupSenderLabel = senderObject.GetComponent<TextMeshProUGUI>();
+        Stretch(popupSenderLabel.rectTransform, 0.14f, 0.75f, 0.47f, 0.96f, 1f);
+        popupSenderLabel.alignment = TextAlignmentOptions.Midline;
+        popupSenderLabel.enableAutoSizing = true;
+        popupSenderLabel.fontSizeMin = 8f;
+        popupSenderLabel.fontSizeMax = 25f;
+        popupSenderLabel.textWrappingMode = TextWrappingModes.NoWrap;
+        popupSenderLabel.overflowMode = TextOverflowModes.Ellipsis;
+        popupSenderLabel.raycastTarget = false;
+        popupRoot.SetActive(false);
+    }
+
+    private void ShowPopup(string message, Color color, float duration = -1f,
+        bool isTaskComment = false, Sprite frame = null, bool keepVisible = false)
+    {
+        if (IsTutorialScene || (isOpen && !keepVisible) || popupRoot == null || popupLabel == null)
+            return;
+
+        popupFrameImage.sprite = frame != null ? frame :
+            isTaskComment && taskCommentFrame != null ? taskCommentFrame : normalCommentFrame;
+        popupSenderLabel.text = isTaskComment ? "リスナー" : string.Empty;
+        popupLabel.text = message;
+        popupLabel.color = color;
+        popupTimer = duration >= 0f ? duration : popupDuration;
+        popupPersistent = keepVisible;
+        popupRoot.SetActive(true);
+    }
+
+    private void CreateRuntimeUi()
+    {
+        EnsureEventSystem();
+        uiRoot = new GameObject("Comment Task Canvas", typeof(RectTransform),
+            typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        uiRoot.transform.SetParent(transform, false);
+
+        Canvas canvas = uiRoot.GetComponent<Canvas>();
+        canvas.sortingOrder = 100;
+
+        CanvasScaler scaler = uiRoot.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        CreateBackdrop(uiRoot.transform);
+        RectTransform commentPanel = CreatePanel(
+            uiRoot.transform, "コメント", commentPanelRect);
+        RectTransform taskPanel = CreatePanel(
+            uiRoot.transform, "タスク", taskPanelRect);
+        commentContent = CreateContent(commentPanel, "Comment Content");
+        taskContent = CreateContent(taskPanel, "Task Content");
+        ConfigureCanvasForCurrentMode();
+    }
+
+    private void EnsureUiExists(bool applyInspectorLayout)
+    {
+        Transform existingCanvas = transform.Find("Comment Task Canvas");
+        if (existingCanvas == null)
+        {
+            CreateRuntimeUi();
+        }
+        else
+        {
+            uiRoot = existingCanvas.gameObject;
+            Transform commentPanel = existingCanvas.Find("コメント Panel");
+            Transform taskPanel = existingCanvas.Find("タスク Panel");
+            commentContent = commentPanel != null
+                ? commentPanel.Find("Comment Content") as RectTransform
+                : null;
+            taskContent = taskPanel != null
+                ? taskPanel.Find("Task Content") as RectTransform
+                : null;
+
+            if (commentContent == null || taskContent == null)
+            {
+                DestroyGeneratedObject(uiRoot);
+                CreateRuntimeUi();
+            }
+            else
+            {
+                SetHideFlagsRecursively(existingCanvas, HideFlags.None);
+                if (applyInspectorLayout)
+                    ApplySavedLayout(existingCanvas);
+            }
+        }
+
+        RectTransform backdrop = uiRoot.transform.Find("Backdrop") as RectTransform;
+        if (backdrop != null)
+            Stretch(backdrop, 0f, 0f, 1f, 1f, 0f);
+        MakeBackgroundOpaque(backdrop);
+        MakeBackgroundOpaque(uiRoot.transform.Find("コメント Panel"));
+        MakeBackgroundOpaque(uiRoot.transform.Find("タスク Panel"));
+        EnsureCloseButton();
+        uiRoot.SetActive(true);
+        ConfigureCanvasForCurrentMode();
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying && gameObject.scene.IsValid())
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+#endif
+    }
+
+    private void ConfigureCanvasForCurrentMode()
+    {
+        if (uiRoot == null)
+            return;
+
+        Canvas canvas = uiRoot.GetComponent<Canvas>();
+        RectTransform canvasRect = uiRoot.GetComponent<RectTransform>();
+        if (canvas == null || canvasRect == null)
+            return;
+
+        if (Application.isPlaying)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasRect.localPosition = Vector3.zero;
+            canvasRect.localRotation = Quaternion.identity;
+            canvasRect.localScale = Vector3.one;
+        }
+        else
+        {
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = null;
+            canvasRect.sizeDelta = new Vector2(1920f, 1080f);
+            canvasRect.localPosition = editorPreviewPosition;
+            canvasRect.localRotation = Quaternion.identity;
+            canvasRect.localScale = Vector3.one * editorPreviewScale;
+        }
+    }
+
+    private static void DestroyGeneratedObject(GameObject target)
+    {
+        if (target == null)
+            return;
+        if (Application.isPlaying)
+            Destroy(target);
+        else
+            DestroyImmediate(target);
+    }
+
+    private void ApplySavedLayout(Transform canvasTransform)
+    {
+        RectTransform backdrop = canvasTransform.Find("Backdrop") as RectTransform;
+        RectTransform commentPanel = canvasTransform.Find("コメント Panel") as RectTransform;
+        RectTransform taskPanel = canvasTransform.Find("タスク Panel") as RectTransform;
+
+        if (backdrop != null)
+            Stretch(backdrop, 0f, 0f, 1f, 1f, 0f);
+        ApplyPanelRect(commentPanel, commentPanelRect);
+        ApplyPanelRect(taskPanel, taskPanelRect);
+
+        ApplyContentPadding(commentContent);
+        ApplyContentPadding(taskContent);
+    }
+
+    private static void ApplyPanelRect(RectTransform panel, Rect layout)
+    {
+        if (panel == null)
+            return;
+        Stretch(panel, Mathf.Clamp01(layout.xMin), Mathf.Clamp01(layout.yMin),
+            Mathf.Clamp01(layout.xMax), Mathf.Clamp01(layout.yMax), 0f);
+    }
+
+    private void ApplyContentPadding(RectTransform content)
+    {
+        if (content == null)
+            return;
+        content.offsetMin = new Vector2(panelContentPadding, panelContentPadding);
+        content.offsetMax = new Vector2(-panelContentPadding, -(panelContentPadding + 77f));
+    }
+
+    private static void SetHideFlagsRecursively(Transform root, HideFlags flags)
+    {
+        root.gameObject.hideFlags = flags;
+        for (int i = 0; i < root.childCount; i++)
+            SetHideFlagsRecursively(root.GetChild(i), flags);
+    }
+
+    private void EnsureEventSystem()
+    {
+        if (FindFirstObjectByType<EventSystem>() != null)
+            return;
+        GameObject eventSystem = new GameObject("Jikken EventSystem",
+            typeof(EventSystem), typeof(InputSystemUIInputModule));
+        eventSystem.transform.SetParent(transform, false);
+    }
+
+    private void EnsureCloseButton()
+    {
+        Transform existing = uiRoot.transform.Find("Close Messages Button");
+        if (existing != null)
+        {
+            Sprite[] replacementSprites = Resources.LoadAll<Sprite>("cancel_button");
+            if (replacementSprites.Length > 0 && existing.TryGetComponent<Image>(out var existingImage))
+            {
+                existingImage.sprite = replacementSprites[0];
+                existingImage.preserveAspect = true;
+            }
+            Button existingButton = existing.GetComponent<Button>();
+            existingButton.onClick.RemoveListener(CloseCommentScreen);
+            existingButton.onClick.AddListener(CloseCommentScreen);
+            return;
+        }
+
+        GameObject close = new GameObject("Close Messages Button", typeof(RectTransform),
+            typeof(Image), typeof(Button));
+        close.transform.SetParent(uiRoot.transform, false);
+        RectTransform rect = close.GetComponent<RectTransform>();
+        rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
+        rect.anchoredPosition = new Vector2(-24f, -24f);
+        rect.sizeDelta = new Vector2(64f, 64f);
+        Image image = close.GetComponent<Image>();
+        Sprite[] sprites = Resources.LoadAll<Sprite>("cancel_button");
+        if (sprites.Length > 0)
+        {
+            image.sprite = sprites[0];
+            image.preserveAspect = true;
+        }
+        else
+        {
+            GameObject label = CreateTextObject("Close Label", close.transform, "×", 48f, Color.white);
+            Stretch(label.GetComponent<RectTransform>(), 0f, 0f, 1f, 1f, 0f);
+            label.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        }
+        Button button = close.GetComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(CloseCommentScreen);
+    }
+
+    private static void MakeBackgroundOpaque(Transform target)
+    {
+        if (target == null || !target.TryGetComponent<Image>(out var image))
+            return;
+        Color color = image.color;
+        color.a = 1f;
+        image.color = color;
+    }
+
+    private void CreateBackdrop(Transform parent)
+    {
+        GameObject backdrop = new GameObject("Backdrop", typeof(RectTransform), typeof(Image));
+        backdrop.transform.SetParent(parent, false);
+        RectTransform rect = backdrop.GetComponent<RectTransform>();
+        Stretch(rect, 0f, 0f, 1f, 1f, 0f);
+        backdrop.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f, 1f);
+    }
+
+    private RectTransform CreatePanel(Transform parent, string title, Rect layout)
+    {
+        GameObject panel = new GameObject(title + " Panel", typeof(RectTransform),
+            typeof(Image), typeof(Outline), typeof(RectMask2D));
+        panel.transform.SetParent(parent, false);
+        RectTransform panelRect = panel.GetComponent<RectTransform>();
+        float minX = Mathf.Clamp01(layout.xMin);
+        float minY = Mathf.Clamp01(layout.yMin);
+        float maxX = Mathf.Clamp01(layout.xMax);
+        float maxY = Mathf.Clamp01(layout.yMax);
+        Stretch(panelRect, minX, minY, maxX, maxY, 0f);
+        panel.GetComponent<Image>().color = panelColor;
+        Outline outline = panel.GetComponent<Outline>();
+        outline.effectColor = new Color(0.01f, 0.07f, 0.09f, 1f);
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        GameObject titleObject = CreateTextObject(title + " Title", panel.transform,
+            title, 42f, Color.white);
+        RectTransform titleRect = titleObject.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.anchoredPosition = new Vector2(0f, -24f);
+        titleRect.sizeDelta = new Vector2(0f, 70f);
+        return panelRect;
+    }
+
+    private RectTransform CreateContent(RectTransform panel, string name)
+    {
+        GameObject content = new GameObject(name, typeof(RectTransform));
+        content.transform.SetParent(panel, false);
+        RectTransform rect = content.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(panelContentPadding, panelContentPadding);
+        rect.offsetMax = new Vector2(-panelContentPadding, -(panelContentPadding + 77f));
+        return rect;
+    }
+
+    private void SpawnComment()
+    {
+        bool canSpawnTask = taskComments != null && taskComments.Length > 0;
+        bool isTask = canSpawnTask && UnityEngine.Random.Range(0f, 100f) < taskCommentChance;
+        int taskIndex = isTask ? UnityEngine.Random.Range(0, taskComments.Length) : -1;
+        string message = isTask ? taskComments[taskIndex].commentText : GetRandomNormalWord();
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        GameObject comment = CreateTextObject(isTask ? "Task Comment" : "Comment",
+            isTask ? taskContent : commentContent, message, fontSize, isTask ? taskTextColor : normalTextColor);
+        RectTransform rect = comment.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+
+        if (isTask)
+        {
+            Vector2 destination = roadMap != null
+                ? roadMap.GetRandomPointOnRoad()
+                : Vector2.zero;
+            TextMeshProUGUI taskLabel = comment.GetComponent<TextMeshProUGUI>();
+            taskLabel.text = $"◆ 座標 X:{destination.x:F1}、Y:{destination.y:F1} を調査して！";
+            Button button = comment.AddComponent<Button>();
+            button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
+            int capturedIndex = taskIndex;
+            button.onClick.AddListener(() => AcceptTask(rect, capturedIndex, destination));
+        }
+        else
+        {
+            comment.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        }
+
+        ShowPopup(comment.GetComponent<TextMeshProUGUI>().text,
+            isTask ? taskTextColor : popupTextColor, isTaskComment: isTask);
+
+        if (isTask)
+        {
+            taskEntries.Insert(0, rect);
+            RegisterPendingTask(rect);
+        }
+        else
+            comments.Insert(0, rect);
+        PlayCommentAppearedSound();
+        ArrangeComments();
+        while (comments.Count > maximumComments)
+            RemoveCommentAt(comments.Count - 1);
+    }
+
+    private void BeginIntroTutorial()
+    {
+        tutorialStep = 1;
+        tutorialTimer = introFirstMessageDuration;
+        AddTutorialHistoryComment("wasdでキャラを動かしてみよう", normalTextColor);
+        ShowPopup("wasdでキャラを動かしてみよう", normalTextColor);
+        popupTimer = tutorialTimer;
+    }
+
+    private void UpdateIntroTutorial()
+    {
+        if (!playIntroTutorial || tutorialStep <= 0 || tutorialStep >= 5)
+            return;
+
+        tutorialTimer -= Time.deltaTime;
+        if (tutorialStep == 1 && tutorialTimer <= 0f)
+        {
+            tutorialStep = 2;
+            CreateTutorialTaskComment(new Vector2(0f, 20f),
+                "◆ (0,20)の地点に行ってみよう", true);
+            // タスクはまだ開始せず、先に選択方法を案内する。
+            tutorialStep = 3;
+            tutorialTimer = 2f;
+            return;
+        }
+
+        if (tutorialStep == 3)
+        {
+            if (!tutorialStep3CommentCreated)
+            {
+                AddTutorialHistoryComment(
+                    "マウススクロールでメッセージを開き、左のタスクを確認しよう",
+                    normalTextColor);
+                tutorialStep3CommentCreated = true;
+                tutorialTimer = tutorialMessageInterval;
+            }
+
+            if (isOpen)
+            {
+                tutorialStep = 4;
+                tutorialTimer = 0f;
+                tutorialTaskCommentCreated = false;
+            }
+            else if (tutorialTimer <= 0f)
+            {
+                ShowPopup("マウススクロールでメッセージを開き、左のタスクを確認しよう",
+                    popupTextColor);
+                PlayCommentAppearedSound();
+                tutorialTimer = tutorialMessageInterval;
+            }
+            return;
+        }
+
+        if (tutorialStep == 4 && tutorialTimer <= 0f)
+        {
+            bool isLoopPlayback = tutorialTaskCommentCreated;
+            ShowPopup("左のタスクをクリックして開始。右上の×ボタンで閉じられるよ", popupTextColor);
+            if (isLoopPlayback)
+                PlayCommentAppearedSound();
+            tutorialTimer = tutorialMessageInterval;
+            if (!tutorialTaskCommentCreated)
+            {
+                GameObject instruction = CreateTextObject("Tutorial Instruction", commentContent,
+                    "左のタスクをクリックして開始。右上の×ボタンで閉じられるよ",
+                    fontSize, normalTextColor);
+                RectTransform instructionRect = instruction.GetComponent<RectTransform>();
+                ConfigureListItem(instructionRect);
+                instruction.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+                comments.Insert(0, instructionRect);
+                PlayCommentAppearedSound();
+                tutorialTaskCommentCreated = true;
+                ArrangeComments();
+            }
+        }
+    }
+
+    private void CreateTutorialTaskComment(Vector2 destination, string message, bool isTutorialTask)
+    {
+        if (commentContent == null || taskComments == null || taskComments.Length == 0)
+            return;
+
+        CreateSelectableTaskComment(message,
+            rect => AcceptTask(rect, 0, destination, isTutorialTask));
+    }
+
+    private void CreateSelectableTaskComment(string message, Action<RectTransform> onSelected)
+    {
+        GameObject comment = CreateTextObject("Selectable Task", taskContent,
+            message, fontSize, taskTextColor);
+        RectTransform rect = comment.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+        Button button = comment.AddComponent<Button>();
+        button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
+        button.onClick.AddListener(() => onSelected(rect));
+        taskEntries.Insert(0, rect);
+        RegisterPendingTask(rect);
+        PlayCommentAppearedSound();
+        ArrangeComments();
+        ShowPopup(message, taskTextColor, isTaskComment: true);
+    }
+
+    private void AddTutorialHistoryComment(string message, Color color)
+    {
+        if (commentContent == null || string.IsNullOrEmpty(message))
+            return;
+
+        GameObject comment = CreateTextObject("Tutorial Comment History", commentContent,
+            message, fontSize, color);
+        RectTransform rect = comment.GetComponent<RectTransform>();
+        ConfigureListItem(rect);
+        comment.GetComponent<TextMeshProUGUI>().raycastTarget = false;
+        comments.Insert(0, rect);
+        PlayCommentAppearedSound();
+        ArrangeComments();
+    }
+
+    private string GetRandomNormalWord()
+    {
+        if (words == null || words.Length == 0)
+            return string.Empty;
+        return words[UnityEngine.Random.Range(0, words.Length)];
+    }
+
+    private void AcceptTask(RectTransform sourceComment, int taskIndex, Vector2 destination,
+        bool isTutorialTask = false)
+    {
+        if (taskIndex < 0 || taskIndex >= taskComments.Length || HasActiveTask())
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+
+        string taskDisplayText =
+            $"タスク：指定地点へ移動\nX:{destination.x:F1}、Y:{destination.y:F1} のところへ進め";
+        AcceptedTask acceptedTask = new AcceptedTask
+        {
+            destination = destination,
+            displayText = taskDisplayText,
+            isTutorialTask = isTutorialTask,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.Destination
+        };
+
+        if (roadMap == null)
+            roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        if (player == null)
+        {
+            playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+            if (playerMovement != null)
+                player = playerMovement.transform;
+        }
+
+        // 左のタスクをクリックした時点で受諾と選択を同時に行う。
+        SelectTask(acceptedTask);
+        if (tutorialStep == 4 && isTutorialTask)
+            tutorialStep = 5;
+    }
+
+    private void SelectTask(AcceptedTask task)
+    {
+        if (task == null)
+            return;
+
+        PlayTaskSelectedSound();
+        selectedTask = task;
+        mainStorySelectedTasks.Add(task.designTaskId);
+        PendingTaskSelected(task.sourceComment);
+        if (task.sourceComment != null)
+        {
+            task.sourceComment.GetComponent<TextMeshProUGUI>().text = "【進行中】\n" + task.displayText;
+            ArrangeComments();
+        }
+
+        if (roadMap != null && task.completionType == TaskCompletionType.Destination)
+        {
+            roadMap.SetTaskDestination(task.destination, task.displayText);
+            CreateTaskArrivalTrigger(roadMap.TaskDestination);
+        }
+        else
+        {
+            roadMap?.SetActiveTaskText(task.displayText);
+        }
+    }
+
+    private void CreateTaskArrivalTrigger(Vector2 destination)
+    {
+        if (taskArrivalTriggerObject != null)
+            Destroy(taskArrivalTriggerObject);
+
+        taskArrivalTriggerObject = new GameObject("Task Arrival Trigger");
+        taskArrivalTriggerObject.transform.position = destination;
+        int ignoreRaycastLayer = LayerMask.NameToLayer("Ignore Raycast");
+        if (ignoreRaycastLayer >= 0)
+            taskArrivalTriggerObject.layer = ignoreRaycastLayer;
+
+        CircleCollider2D triggerCollider = taskArrivalTriggerObject.AddComponent<CircleCollider2D>();
+        triggerCollider.isTrigger = true;
+        triggerCollider.radius = taskArrivalDistance;
+        TaskDestinationTrigger trigger = taskArrivalTriggerObject.AddComponent<TaskDestinationTrigger>();
+        trigger.Configure(this);
+
+        GameObject markerObject = new GameObject("Task Destination Marker");
+        markerObject.transform.SetParent(taskArrivalTriggerObject.transform, false);
+        markerObject.layer = taskArrivalTriggerObject.layer;
+        SpriteRenderer markerRenderer = markerObject.AddComponent<SpriteRenderer>();
+        markerRenderer.sprite = GetTaskDestinationMarkerSprite();
+        markerRenderer.color = new Color(1f, 0.85f, 0.15f, 0.9f);
+        markerRenderer.sortingLayerName = "New Layer 2";
+        markerRenderer.sortingOrder = 1100;
+        markerObject.transform.localScale = Vector3.one * 0.8f;
+    }
+
+    private void MarkTaskCommentSelected(RectTransform sourceComment)
+    {
+        if (sourceComment != null)
+        {
+            Button sourceButton = sourceComment.GetComponent<Button>();
+            if (sourceButton != null)
+                sourceButton.interactable = false;
+            TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
+            if (sourceLabel != null)
+            {
+                sourceLabel.raycastTarget = false;
+                sourceLabel.color = Color.yellow;
+                sourceLabel.fontStyle = FontStyles.Bold;
+            }
+        }
+        ArrangeComments();
+    }
+
+    private static void MarkTaskCommentCompleted(RectTransform sourceComment)
+    {
+        if (sourceComment == null)
+            return;
+
+        TextMeshProUGUI sourceLabel = sourceComment.GetComponent<TextMeshProUGUI>();
+        if (sourceLabel != null)
+        {
+            sourceLabel.text = sourceLabel.text.Replace("【進行中】", "【完了】");
+            sourceLabel.color = new Color(0.35f, 1f, 0.45f, 1f);
+            sourceLabel.fontStyle = FontStyles.Bold;
+            sourceLabel.raycastTarget = false;
+        }
+    }
+
+    private bool HasActiveTask()
+    {
+        return selectedTask != null || (playerMovement != null && playerMovement.IsInInterior);
+    }
+
+    private void OnDestroy()
+    {
+        DisposePhaseTasks();
+        SubjiEnemyChase.AnyEnemyChasingChanged -= SwitchChaseMusic;
+        if (drinkItemController != null)
+        {
+            drinkItemController.DrinkPurchased -= CompleteVendingTask;
+            drinkItemController.VendingAttemptFailed -= ShowVendingFailure;
+        }
+        BushHideSpot2D.PlayerEnteredBush -= CompleteBushTask;
+        if (coffeeCupInteraction != null)
+            coffeeCupInteraction.LightActivated -= CompleteCoffeeCupTask;
+        if (castleInteraction != null)
+            castleInteraction.LightActivated -= CompleteCastleTask;
+        if (gameClearGoal != null)
+            gameClearGoal.GoalReached -= CompleteEscapeTask;
+    }
+
+    private static Sprite GetTaskDestinationMarkerSprite()
+    {
+        if (taskDestinationMarkerSprite == null)
+        {
+            taskDestinationMarkerSprite = Sprite.Create(Texture2D.whiteTexture,
+                new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            taskDestinationMarkerSprite.name = "Runtime Task Destination Marker";
+        }
+        return taskDestinationMarkerSprite;
+    }
+
+    public void NotifyTaskDestinationReached()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.Destination)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private RectTransform CreateTaskView(string message)
+    {
+        // 選択元のタスクをそのまま進行表示に使い、二重表示を防ぐ。
+        return null;
+    }
+
+    private void SubscribeToWorldTasks()
+    {
+        drinkItemController = FindFirstObjectByType<DrinkItemController>();
+        if (drinkItemController != null)
+        {
+            drinkItemController.DrinkPurchased += CompleteVendingTask;
+            drinkItemController.VendingAttemptFailed += ShowVendingFailure;
+        }
+        BushHideSpot2D.PlayerEnteredBush += CompleteBushTask;
+        if (enablePhaseTwoTasks)
+            return;
+        coffeeCupInteraction = CoffeeCupLightInteraction.FindOrCreateInScene(
+            "コーヒーカップ", 4f, 6f, 3f, false);
+        if (coffeeCupInteraction != null)
+            coffeeCupInteraction.LightActivated += CompleteCoffeeCupTask;
+        castleInteraction = CoffeeCupLightInteraction.FindOrCreateInScene(
+            "城", 4f, 7f, 6f, true);
+        if (castleInteraction != null)
+            castleInteraction.LightActivated += CompleteCastleTask;
+        ApplyEnemyActivationStage(SubjiEnemyChase.SpawnTiming.GameStart);
+    }
+
+    private void StartPostTutorialTasks()
+    {
+        postTutorialTasksStarted = true;
+        const string message = "警備員から逃げながらタスクをこなして登録者を増やそう";
+        AddTutorialHistoryComment(message, normalTextColor);
+        ShowPopup(message, popupTextColor);
+        postTutorialSequenceStep = 1;
+        postTutorialSequenceTimer = id5To6Delay;
+    }
+
+    private void UpdatePostTutorialSequence()
+    {
+        if (!postTutorialTasksStarted || postTutorialSequenceStep <= 0 ||
+            postTutorialSequenceStep >= 3)
+            return;
+
+        postTutorialSequenceTimer -= Time.deltaTime;
+        if (postTutorialSequenceTimer > 0f)
+            return;
+
+        if (postTutorialSequenceStep == 1)
+        {
+            const string message = "自販機でドリンクを購入しよう";
+            CreateSelectableTaskComment(message,
+                rect => AcceptWorldTask(rect, true, message));
+            postTutorialSequenceStep = 2;
+            postTutorialSequenceTimer = id6To7Delay;
+            return;
+        }
+
+        const string bushMessage = "ブッシュの中に隠れよう";
+        CreateSelectableTaskComment(bushMessage,
+            rect => AcceptWorldTask(rect, false, bushMessage));
+        postTutorialSequenceStep = 3;
+    }
+
+    private void AcceptWorldTask(RectTransform sourceComment, bool isVendingTask,
+        string message)
+    {
+        if (HasActiveTask())
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        if (roadMap == null)
+            roadMap = FindFirstObjectByType<SubjiRoadMap>();
+        TaskCompletionType completionType = isVendingTask
+            ? TaskCompletionType.VendingPurchase
+            : TaskCompletionType.BushHide;
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = completionType
+        });
+
+        activeWorldTaskGuidance = isVendingTask
+            ? "自販機の近くでEを押すと購入できるよ"
+            : "ブッシュの近くでEを押すと隠れられるよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+
+        if (isVendingTask)
+            roadMap?.SetActiveTaskTargets(drinkItemController?.GetVendingMachineTransforms());
+        else
+            roadMap?.SetActiveTaskTargets(FindObjectsByType<BushHideSpot2D>(
+                FindObjectsSortMode.None).Select(bush => bush.transform));
+    }
+
+    private void UpdateWorldTaskGuidance()
+    {
+        if (MainStoryOwnsPopup) return;
+        if (selectedTask == null || string.IsNullOrEmpty(activeWorldTaskGuidance))
+            return;
+
+        worldTaskGuidanceTimer -= Time.deltaTime;
+        if (worldTaskGuidanceTimer > 0f)
+            return;
+
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        PlayCommentAppearedSound();
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+    }
+
+    private void CompleteVendingTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.VendingPurchase)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteBushTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.BushHide)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteCoffeeCupTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.CoffeeCupLight)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteCastleTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.CastleLight)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void CompleteEscapeTask()
+    {
+        if (selectedTask == null ||
+            selectedTask.completionType != TaskCompletionType.EscapeGoal)
+            return;
+
+        CompleteActiveTask();
+    }
+
+    private void TryCreateCoffeeCupTask()
+    {
+        if (coffeeCupTaskCreated || !vendingTutorialCompleted ||
+            !bushTutorialCompleted || coffeeCupInteraction == null)
+            return;
+
+        coffeeCupTaskCreated = true;
+        const string message = "コーヒーカップに電気を灯そう";
+        CreateSelectableTaskComment(message,
+            rect => AcceptCoffeeCupTask(rect, message));
+    }
+
+    private void AcceptCoffeeCupTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask() || coffeeCupInteraction == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.CoffeeCupLight,
+            subscriberReward = 500
+        });
+
+        activeWorldTaskGuidance = "コーヒーカップの近くでEを押すとつくよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+        coffeeCupInteraction.SetTaskActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { coffeeCupInteraction.transform });
+    }
+
+    private void TryCreateCastleTask()
+    {
+        if (castleTaskCreated || castleInteraction == null)
+            return;
+
+        castleTaskCreated = true;
+        const string message = "城の電気を灯そう";
+        CreateSelectableTaskComment(message,
+            rect => AcceptCastleTask(rect, message));
+    }
+
+    private void AcceptCastleTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask() || castleInteraction == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.CastleLight,
+            subscriberReward = 1000
+        });
+
+        activeWorldTaskGuidance = "城の近くでEで点灯するよ";
+        AddTutorialHistoryComment(activeWorldTaskGuidance, normalTextColor);
+        ShowPopup(activeWorldTaskGuidance, popupTextColor);
+        worldTaskGuidanceTimer = tutorialMessageInterval;
+        castleInteraction.SetTaskActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { castleInteraction.transform });
+    }
+
+    private void TryCreateEscapeTask()
+    {
+        const string message = "脱出せよ";
+        CreateSelectableTaskComment(message,
+            rect => AcceptEscapeTask(rect, message));
+    }
+
+    private void AcceptEscapeTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask())
+            return;
+
+        if (gameClearGoal == null)
+        {
+            gameClearGoal = FindFirstObjectByType<SubjiGameClearGoal>();
+            if (gameClearGoal != null)
+                gameClearGoal.GoalReached += CompleteEscapeTask;
+        }
+        if (gameClearGoal == null)
+            return;
+
+        MarkTaskCommentSelected(sourceComment);
+        string taskDisplayText = $"タスク：{message}";
+        SelectTask(new AcceptedTask
+        {
+            displayText = taskDisplayText,
+            taskView = CreateTaskView(taskDisplayText),
+            sourceComment = sourceComment,
+            completionType = TaskCompletionType.EscapeGoal,
+            subscriberReward = 0
+        });
+
+        gameClearGoal.SetGoalActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { gameClearGoal.GoalTransform });
+    }
+
+    private void CompleteActiveTask()
+    {
+        if (selectedTask == null)
+            return;
+
+        PlayTaskCompletedSound();
+        AcceptedTask completedTask = selectedTask;
+        selectedTask = null;
+        activeWorldTaskGuidance = null;
+        worldTaskGuidanceTimer = 0f;
+        playerMovement?.CompleteTask(completedTask.subscriberReward);
+        MarkTaskCommentCompleted(completedTask.sourceComment);
+        if (completedTask.taskView != null)
+            Destroy(completedTask.taskView.gameObject);
+
+        if (completedTask.completionType == TaskCompletionType.Destination)
+            roadMap?.ClearTaskDestination();
+        else
+            roadMap?.ClearActiveTaskText();
+
+        if (completedTask.completionType == TaskCompletionType.TutorialLight)
+            return;
+
+        if (completedTask.completionType == TaskCompletionType.VendingPurchase)
+        {
+            vendingTutorialCompleted = true;
+            const string message = "ドリンクを飲むと一定時間Shiftダッシュが強化されるよ";
+            AddTutorialHistoryComment(message, normalTextColor);
+            ShowPopup(message, popupTextColor, 4f);
+        }
+        else if (completedTask.completionType == TaskCompletionType.BushHide)
+        {
+            bushTutorialCompleted = true;
+            const string message = "ブッシュの中に隠れると敵の追跡から逃れられるよ";
+            AddTutorialHistoryComment(message, normalTextColor);
+            ShowPopup(message, popupTextColor, 4f);
+        }
+        else if (completedTask.completionType == TaskCompletionType.CoffeeCupLight)
+        {
+            coffeeCupInteraction?.SetTaskActive(false);
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTask12);
+            TryCreateCastleTask();
+        }
+        else if (completedTask.completionType == TaskCompletionType.CastleLight)
+        {
+            castleInteraction?.SetTaskActive(false);
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTask14);
+            TryCreateEscapeTask();
+        }
+
+        if (!enablePhaseTwoTasks)
+        {
+            TrySpawnGreenGuard();
+            TryCreateCoffeeCupTask();
+        }
+
+        if (taskArrivalTriggerObject != null)
+        {
+            Destroy(taskArrivalTriggerObject);
+            taskArrivalTriggerObject = null;
+        }
+
+        if (enablePhaseTwoTasks)
+        {
+            AdvancePhaseTasks(completedTask);
+            return;
+        }
+
+        if (playIntroTutorial && completedTask.isTutorialTask &&
+            !postTutorialTasksStarted)
+            StartPostTutorialTasks();
+    }
+
+    private void TrySpawnGreenGuard()
+    {
+        if (greenGuardSpawned || !vendingTutorialCompleted ||
+            !bushTutorialCompleted)
+            return;
+
+        if (player == null)
+        {
+            playerMovement = FindFirstObjectByType<SubjiPlayerMovement>();
+            if (playerMovement != null)
+                player = playerMovement.transform;
+        }
+        if (player == null)
+            return;
+
+        if (greenGuardContainer != null)
+        {
+            foreach (SubjiEnemyChase sceneEnemy in
+                greenGuardContainer.GetComponentsInChildren<SubjiEnemyChase>(true))
+            {
+                sceneEnemy.player = player;
+                sceneEnemy.roadMap = roadMap != null
+                    ? roadMap
+                    : FindFirstObjectByType<SubjiRoadMap>();
+                sceneEnemy.ApplyAppearanceAndCollider();
+            }
+            ApplyEnemyActivationStage(
+                SubjiEnemyChase.SpawnTiming.AfterTasks6And7);
+        }
+        else
+        {
+            GameObject guard = new GameObject("Green Guard Post (-10, -3)");
+            guard.transform.position = new Vector3(-10f, -3f, 0f);
+            SubjiEnemyChase enemy = guard.AddComponent<SubjiEnemyChase>();
+            enemy.spriteResourcePath = "guard_green_enemy";
+            enemy.movementType = SubjiEnemyChase.MovementType.GuardPost;
+            enemy.matchPlayerMoveSpeed = true;
+            enemy.returnSpeed = 1f;
+            enemy.guardLookInterval = 1.5f;
+            enemy.useRadialDetection = false;
+            enemy.player = player;
+            enemy.roadMap = roadMap != null
+                ? roadMap
+                : FindFirstObjectByType<SubjiRoadMap>();
+            enemy.ApplyAppearanceAndCollider();
+        }
+        greenGuardSpawned = true;
+    }
+
+    private void ApplyEnemyActivationStage(
+        SubjiEnemyChase.SpawnTiming reachedStage)
+    {
+        if (greenGuardContainer == null)
+            return;
+
+        greenGuardContainer.SetActive(true);
+        if (reachedStage == SubjiEnemyChase.SpawnTiming.AfterTask12)
+            EnsureAfterTask12EnemyExists();
+        foreach (SubjiEnemyChase enemy in FindObjectsByType<SubjiEnemyChase>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            enemy.gameObject.SetActive(enemy.spawnTiming <= reachedStage);
+        }
+    }
+
+    private void EnsureAfterTask12EnemyExists()
+    {
+        foreach (SubjiEnemyChase existingEnemy in
+            greenGuardContainer.GetComponentsInChildren<SubjiEnemyChase>(true))
+        {
+            if (existingEnemy.spawnTiming == SubjiEnemyChase.SpawnTiming.AfterTask12)
+                return;
+        }
+
+        SubjiEnemyChase source =
+            greenGuardContainer.GetComponentInChildren<SubjiEnemyChase>(true);
+        GameObject guard = new GameObject("Green Guard Post (After ID12 Runtime)");
+        guard.transform.SetParent(greenGuardContainer.transform, false);
+        guard.transform.position = source != null
+            ? source.transform.position + Vector3.right * 3f
+            : new Vector3(-7f, -3f, 0f);
+        SubjiEnemyChase enemy = guard.AddComponent<SubjiEnemyChase>();
+        enemy.spriteResourcePath = source != null
+            ? source.spriteResourcePath
+            : "guard_green_enemy";
+        enemy.movementType = SubjiEnemyChase.MovementType.GuardPost;
+        enemy.spawnTiming = SubjiEnemyChase.SpawnTiming.AfterTask12;
+        enemy.matchPlayerMoveSpeed = true;
+        enemy.returnSpeed = source != null ? source.returnSpeed : 1f;
+        enemy.guardLookInterval = source != null ? source.guardLookInterval : 1.5f;
+        enemy.useRadialDetection = false;
+        enemy.player = player;
+        enemy.roadMap = roadMap;
+        enemy.ApplyAppearanceAndCollider();
+    }
+
+    private GameObject CreateTextObject(string objectName, Transform parent,
+        string text, float size, Color color)
+    {
+        GameObject textObject = new GameObject(objectName, typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(parent, false);
+        TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
+        label.text = text;
+        if (fontAsset != null)
+            label.font = fontAsset;
+        label.fontSize = size;
+        label.color = color;
+        label.alignment = TextAlignmentOptions.Center;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        return textObject;
+    }
+
+    private void ConfigureListItem(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.sizeDelta = new Vector2(0f, commentHeight);
+
+        TextMeshProUGUI label = rect.GetComponent<TextMeshProUGUI>();
+        if (label != null)
+        {
+            label.textWrappingMode = TextWrappingModes.Normal;
+            label.overflowMode = TextOverflowModes.Overflow;
+        }
+        UpdateListItemHeight(rect);
+    }
+
+    private void UpdateListItemHeight(RectTransform rect)
+    {
+        if (rect == null)
+            return;
+
+        TextMeshProUGUI label = rect.GetComponent<TextMeshProUGUI>();
+        RectTransform parentRect = rect.parent as RectTransform;
+        if (label == null || parentRect == null)
+            return;
+
+        float availableWidth = parentRect.rect.width;
+        if (availableWidth <= 1f)
+        {
+            Rect panelLayout = parentRect == taskContent
+                ? taskPanelRect
+                : commentPanelRect;
+            availableWidth = Screen.width * panelLayout.width -
+                panelContentPadding * 2f;
+        }
+        availableWidth = Mathf.Max(1f, availableWidth);
+        float preferredHeight = label.GetPreferredValues(
+            label.text, availableWidth, 0f).y;
+        rect.sizeDelta = new Vector2(0f,
+            Mathf.Max(commentHeight, Mathf.Ceil(preferredHeight) + 12f));
+    }
+
+    private void ArrangeComments()
+    {
+        ArrangeList(taskEntries);
+        ArrangeList(comments);
+    }
+
+    private void ArrangeList(List<RectTransform> entries)
+    {
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            if (entries[i] == null)
+            {
+                entries.RemoveAt(i);
+            }
+        }
+
+        float verticalOffset = 0f;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            UpdateListItemHeight(entries[i]);
+            entries[i].anchoredPosition = new Vector2(0f, -verticalOffset);
+            verticalOffset += entries[i].sizeDelta.y;
+        }
+    }
+
+    private void RemoveCommentAt(int index)
+    {
+        RectTransform rect = comments[index];
+        comments.RemoveAt(index);
+        if (rect != null)
+            Destroy(rect.gameObject);
+    }
+
+    private static void Stretch(RectTransform rect, float minX, float minY,
+        float maxX, float maxY, float margin)
+    {
+        rect.anchorMin = new Vector2(minX, minY);
+        rect.anchorMax = new Vector2(maxX, maxY);
+        rect.offsetMin = new Vector2(margin, margin);
+        rect.offsetMax = new Vector2(-margin, -margin);
+    }
+}

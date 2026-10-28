@@ -1,0 +1,2 @@
+  lightViewAngle: 30
+  lightViewDistance: 5.5

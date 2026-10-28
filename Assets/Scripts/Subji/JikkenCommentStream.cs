@@ -139,7 +139,11 @@ public partial class JikkenCommentStream : MonoBehaviour
     private GameObject popupRoot;
     private TextMeshProUGUI popupLabel;
     private TextMeshProUGUI popupSenderLabel;
+    private Image popupFrameImage;
+    private Sprite normalCommentFrame;
+    private Sprite taskCommentFrame;
     private float popupTimer;
+    private bool popupPersistent;
     private RectTransform commentContent;
     private RectTransform taskContent;
     private float timer;
@@ -351,6 +355,8 @@ public partial class JikkenCommentStream : MonoBehaviour
             UpdatePostTutorialSequence();
         }
         UpdateWorldTaskGuidance();
+        UpdateTaskSelectionReminder();
+        UpdateSelectedTaskIdleReminder();
 
         if (isOpen && Mouse.current != null &&
             Mouse.current.rightButton.wasPressedThisFrame)
@@ -358,7 +364,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             CloseCommentScreen();
         }
 
-        if (!IsTutorialScene && popupRoot != null && popupRoot.activeSelf)
+        if (!IsTutorialScene && !popupPersistent && popupRoot != null && popupRoot.activeSelf)
         {
             if (isOpen)
             {
@@ -371,7 +377,7 @@ public partial class JikkenCommentStream : MonoBehaviour
                 popupRoot.SetActive(false);
         }
 
-        if (autoGenerateComments)
+        if (autoGenerateComments && !mainStoryIntroRunning)
         {
             timer += Time.deltaTime;
             if (timer >= spawnInterval)
@@ -392,7 +398,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (roadMap != null)
             roadMap.MessageScreenOpen = isOpen;
 
-        if (!IsTutorialScene && isOpen && popupRoot != null)
+        if (!IsTutorialScene && !popupPersistent && isOpen && popupRoot != null)
         {
             popupRoot.SetActive(false);
             popupTimer = 0f;
@@ -409,7 +415,7 @@ public partial class JikkenCommentStream : MonoBehaviour
         if (roadMap != null)
             roadMap.MessageScreenOpen = true;
 
-        if (!IsTutorialScene && popupRoot != null)
+        if (!IsTutorialScene && !popupPersistent && popupRoot != null)
         {
             popupRoot.SetActive(false);
             popupTimer = 0f;
@@ -451,6 +457,9 @@ public partial class JikkenCommentStream : MonoBehaviour
 
         Sprite[] popupSprites = Resources.LoadAll<Sprite>("comment");
         Image image = popupRoot.GetComponent<Image>();
+        popupFrameImage = image;
+        Sprite[] taskSprites = Resources.LoadAll<Sprite>("taskcomment");
+        taskCommentFrame = taskSprites.Length > 0 ? taskSprites[0] : null;
         if (popupSprites.Length > 0)
         {
             image.sprite = popupSprites[0];
@@ -462,6 +471,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             image.color = new Color(0f, 0f, 0f, 0.75f);
         }
 
+        normalCommentFrame = image.sprite;
         GameObject textObject = CreateTextObject("Popup Comment Text", popupRoot.transform,
             string.Empty, fontSize, popupTextColor);
         RectTransform textRect = textObject.GetComponent<RectTransform>();
@@ -486,14 +496,19 @@ public partial class JikkenCommentStream : MonoBehaviour
         popupRoot.SetActive(false);
     }
 
-    private void ShowPopup(string message, Color color, float duration = -1f)
+    private void ShowPopup(string message, Color color, float duration = -1f,
+        bool isTaskComment = false, Sprite frame = null, bool keepVisible = false)
     {
-        if (IsTutorialScene || isOpen || popupRoot == null || popupLabel == null)
+        if (IsTutorialScene || (isOpen && !keepVisible) || popupRoot == null || popupLabel == null)
             return;
 
+        popupFrameImage.sprite = frame != null ? frame :
+            isTaskComment && taskCommentFrame != null ? taskCommentFrame : normalCommentFrame;
+        popupSenderLabel.text = isTaskComment ? "リスナー" : string.Empty;
         popupLabel.text = message;
         popupLabel.color = color;
         popupTimer = duration >= 0f ? duration : popupDuration;
+        popupPersistent = keepVisible;
         popupRoot.SetActive(true);
     }
 
@@ -786,10 +801,13 @@ public partial class JikkenCommentStream : MonoBehaviour
         }
 
         ShowPopup(comment.GetComponent<TextMeshProUGUI>().text,
-            isTask ? taskTextColor : popupTextColor);
+            isTask ? taskTextColor : popupTextColor, isTaskComment: isTask);
 
         if (isTask)
+        {
             taskEntries.Insert(0, rect);
+            RegisterPendingTask(rect);
+        }
         else
             comments.Insert(0, rect);
         PlayCommentAppearedSound();
@@ -893,9 +911,10 @@ public partial class JikkenCommentStream : MonoBehaviour
         button.targetGraphic = comment.GetComponent<TextMeshProUGUI>();
         button.onClick.AddListener(() => onSelected(rect));
         taskEntries.Insert(0, rect);
+        RegisterPendingTask(rect);
         PlayCommentAppearedSound();
         ArrangeComments();
-        ShowPopup(message, taskTextColor);
+        ShowPopup(message, taskTextColor, isTaskComment: true);
     }
 
     private void AddTutorialHistoryComment(string message, Color color)
@@ -962,6 +981,13 @@ public partial class JikkenCommentStream : MonoBehaviour
 
         PlayTaskSelectedSound();
         selectedTask = task;
+        selectedTaskIdleSeconds = 0f;
+        selectedTaskActivitySeen = false;
+        selectedTaskHintShown = false;
+        selectedTaskHintUntil = 0f;
+        if (selectedTaskHintRoot != null) selectedTaskHintRoot.SetActive(false);
+        mainStorySelectedTasks.Add(task.designTaskId);
+        PendingTaskSelected(task.sourceComment);
         if (task.sourceComment != null)
         {
             task.sourceComment.GetComponent<TextMeshProUGUI>().text = "【進行中】\n" + task.displayText;
@@ -1050,7 +1076,10 @@ public partial class JikkenCommentStream : MonoBehaviour
         DisposePhaseTasks();
         SubjiEnemyChase.AnyEnemyChasingChanged -= SwitchChaseMusic;
         if (drinkItemController != null)
+        {
             drinkItemController.DrinkPurchased -= CompleteVendingTask;
+            drinkItemController.VendingAttemptFailed -= ShowVendingFailure;
+        }
         BushHideSpot2D.PlayerEnteredBush -= CompleteBushTask;
         if (coffeeCupInteraction != null)
             coffeeCupInteraction.LightActivated -= CompleteCoffeeCupTask;
@@ -1090,7 +1119,10 @@ public partial class JikkenCommentStream : MonoBehaviour
     {
         drinkItemController = FindFirstObjectByType<DrinkItemController>();
         if (drinkItemController != null)
+        {
             drinkItemController.DrinkPurchased += CompleteVendingTask;
+            drinkItemController.VendingAttemptFailed += ShowVendingFailure;
+        }
         BushHideSpot2D.PlayerEnteredBush += CompleteBushTask;
         if (enablePhaseTwoTasks)
             return;
@@ -1178,6 +1210,7 @@ public partial class JikkenCommentStream : MonoBehaviour
 
     private void UpdateWorldTaskGuidance()
     {
+        if (MainStoryOwnsPopup) return;
         if (selectedTask == null || string.IsNullOrEmpty(activeWorldTaskGuidance))
             return;
 
@@ -1309,15 +1342,13 @@ public partial class JikkenCommentStream : MonoBehaviour
     private void TryCreateEscapeTask()
     {
         const string message = "脱出せよ";
+        if (!ActivateEscapeGoal()) return;
         CreateSelectableTaskComment(message,
             rect => AcceptEscapeTask(rect, message));
     }
 
-    private void AcceptEscapeTask(RectTransform sourceComment, string message)
+    private bool ActivateEscapeGoal()
     {
-        if (HasActiveTask())
-            return;
-
         if (gameClearGoal == null)
         {
             gameClearGoal = FindFirstObjectByType<SubjiGameClearGoal>();
@@ -1325,6 +1356,16 @@ public partial class JikkenCommentStream : MonoBehaviour
                 gameClearGoal.GoalReached += CompleteEscapeTask;
         }
         if (gameClearGoal == null)
+            return false;
+
+        gameClearGoal.SetGoalActive(true);
+        roadMap?.SetActiveTaskTargets(new[] { gameClearGoal.GoalTransform });
+        return true;
+    }
+
+    private void AcceptEscapeTask(RectTransform sourceComment, string message)
+    {
+        if (HasActiveTask() || !ActivateEscapeGoal())
             return;
 
         MarkTaskCommentSelected(sourceComment);
@@ -1338,8 +1379,6 @@ public partial class JikkenCommentStream : MonoBehaviour
             subscriberReward = 0
         });
 
-        gameClearGoal.SetGoalActive(true);
-        roadMap?.SetActiveTaskTargets(new[] { gameClearGoal.GoalTransform });
     }
 
     private void CompleteActiveTask()
@@ -1370,7 +1409,7 @@ public partial class JikkenCommentStream : MonoBehaviour
             vendingTutorialCompleted = true;
             const string message = "ドリンクを飲むと一定時間Shiftダッシュが強化されるよ";
             AddTutorialHistoryComment(message, normalTextColor);
-            ShowPopup(message, popupTextColor, 4f);
+            if (!mainStoryIntroRunning) ShowPopup(message, popupTextColor, 4f);
         }
         else if (completedTask.completionType == TaskCompletionType.BushHide)
         {

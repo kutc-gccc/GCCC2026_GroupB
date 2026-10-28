@@ -79,7 +79,8 @@ public class SubjiGameClearGoal : MonoBehaviour
 
         isClear = true;
         GoalReached?.Invoke();
-        StopGame();
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("Clear");
     }
 
     public void GameOver()
@@ -114,6 +115,9 @@ public class SubjiGameClearGoal : MonoBehaviour
         if (!isClear && !isGameOver)
             return;
 
+        int previousDepth = GUI.depth;
+        GUI.depth = -10000;
+
         if (clearStyle == null)
         {
             clearStyle = new GUIStyle(GUI.skin.label);
@@ -127,12 +131,14 @@ public class SubjiGameClearGoal : MonoBehaviour
             restartStyle.fontStyle = FontStyle.Bold;
         }
 
-        GUI.color = new Color(0f, 0f, 0f, 0.82f);
-        GUI.Box(new Rect(0f, 0f, referenceGui.Width, referenceGui.Height), GUIContent.none);
+        Color previousColor = GUI.color;
+        GUI.color = isClear ? Color.black : new Color(0f, 0f, 0f, 0.82f);
+        GUI.DrawTexture(new Rect(0f, 0f, referenceGui.Width, referenceGui.Height), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
         float centerX = referenceGui.Width * 0.5f;
         float centerY = referenceGui.Height * 0.5f;
+
         GUI.Label(new Rect(centerX - 240f, centerY - 130f, 480f, 100f),
             isGameOver ? "GAME OVER" : "CLEAR", clearStyle);
 
@@ -141,6 +147,8 @@ public class SubjiGameClearGoal : MonoBehaviour
         {
             RestartGame();
         }
+        GUI.color = previousColor;
+        GUI.depth = previousDepth;
     }
 
     private void OnDestroy()

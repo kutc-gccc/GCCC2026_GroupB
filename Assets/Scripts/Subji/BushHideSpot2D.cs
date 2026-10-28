@@ -7,6 +7,7 @@ public sealed class BushHideSpot2D : MonoBehaviour
     public static event Action PlayerEnteredBush;
 
     [Header("隠れる操作")]
+    [InspectorName("ブッシュの判定を有効にする")] public bool interactionEnabled;
     public Key interactKey = Key.E;
     [Min(0.1f)] public float interactionDistance = 1.5f;
     public Vector2 hidingPositionOffset = new(0f, 0.5f);
@@ -23,7 +24,7 @@ public sealed class BushHideSpot2D : MonoBehaviour
         if (targetPlayer == null)
             return false;
 
-        if (activeHideSpot != null)
+        if (activeHideSpot != null && activeHideSpot.interactionEnabled)
             return true;
 
         foreach (BushHideSpot2D hideSpot in
@@ -52,6 +53,12 @@ public sealed class BushHideSpot2D : MonoBehaviour
 
     private void Update()
     {
+        if (interactionTrigger != null) interactionTrigger.enabled = interactionEnabled;
+        if (!interactionEnabled)
+        {
+            if (activeHideSpot == this) ExitBush();
+            return;
+        }
         if (Keyboard.current == null)
             return;
 
@@ -96,11 +103,12 @@ public sealed class BushHideSpot2D : MonoBehaviour
 
         interactionTrigger.isTrigger = true;
         interactionTrigger.radius = Mathf.Max(0.1f, interactionDistance);
+        interactionTrigger.enabled = interactionEnabled;
     }
 
     private bool ContainsPlayer(SubjiPlayerMovement targetPlayer)
     {
-        if (targetPlayer == null)
+        if (!interactionEnabled || targetPlayer == null)
             return false;
 
         if (interactionTrigger == null)
@@ -112,6 +120,7 @@ public sealed class BushHideSpot2D : MonoBehaviour
 
     private void EnterBush()
     {
+        if (!interactionEnabled || !isActiveAndEnabled) return;
         positionBeforeHiding = player.transform.position;
         player.transform.position = transform.position + (Vector3)hidingPositionOffset;
         player.SetHidden(true);

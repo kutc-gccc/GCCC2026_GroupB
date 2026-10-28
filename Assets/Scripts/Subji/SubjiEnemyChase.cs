@@ -6,13 +6,18 @@ public class SubjiEnemyChase : MonoBehaviour
     private bool investigatingNoise;
     private Vector2 noisePosition;
     private float noiseExpiresAt;
+    private float noiseApproachSpeed;
 
-    public void InvestigateNoise(Vector2 position)
+    public void InvestigateNoise(Vector2 position, float approachSeconds = 0f)
     {
         if (movementType == MovementType.CompletelyStationary) return;
         noisePosition = position;
         noiseExpiresAt = Time.time + 12f;
         investigatingNoise = true;
+        // Tune travel speed, while leaving normal detection active throughout the approach.
+        noiseApproachSpeed = approachSeconds > 0f
+            ? Mathf.Max(0.1f, (Vector2.Distance(transform.position, position) - idleDetectionRadius) / approachSeconds)
+            : -1f;
     }
     public static readonly HashSet<SubjiEnemyChase> ActiveEnemies = new();
     private static readonly HashSet<SubjiEnemyChase> ChasingEnemies = new();
@@ -49,7 +54,7 @@ public class SubjiEnemyChase : MonoBehaviour
     [Tooltip("Resourcesから読み込む敵スプライトの名前")]
     public string spriteResourcePath = "guard";
     [Tooltip("敵イラストの表示倍率")]
-    public Vector2 visualScale = new Vector2(1.567f, 1.5f);
+    public Vector2 visualScale = new Vector2(1.5f, 1.5f);
     [Tooltip("接触判定の大きさ。敵の足元寄りに細く設定できます")]
     public Vector2 collisionSize = new Vector2(0.33333334f, 0.33333334f);
     [Tooltip("接触判定の中心位置")]
@@ -147,6 +152,7 @@ public class SubjiEnemyChase : MonoBehaviour
     private bool wasPlayerDetected;
     private AudioSource playerSpottedAudioSource;
     private bool isRegisteredAsChasing;
+    public bool IsChasingPlayer => isRegisteredAsChasing;
     private float nextLightVisibilityCheckTime;
 
     public float CurrentDetectionRadius
@@ -174,6 +180,27 @@ public class SubjiEnemyChase : MonoBehaviour
     }
 #endif
 
+    private static Material sharedEnemyMaterial;
+
+    private void ApplyUniformScale()
+    {
+        // Runtime-created enemies must inherit the same stage scale as placed enemies.
+        if (Application.isPlaying && transform.parent == null)
+        {
+            GameObject enemyRoot = GameObject.Find("Enemies");
+            if (enemyRoot != null && enemyRoot.scene == gameObject.scene)
+                transform.SetParent(enemyRoot.transform, true);
+        }
+        visualScale = new Vector2(1.5f, 1.5f);
+        transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+    }
+
+    private void OnTransformParentChanged()
+    {
+        visualScale = new Vector2(1.5f, 1.5f);
+        transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+    }
+
     public void ApplyAppearanceAndCollider()
     {
         enemyRenderer = GetComponent<SpriteRenderer>();
@@ -187,12 +214,14 @@ public class SubjiEnemyChase : MonoBehaviour
                 enemyRenderer.sprite = sprites[0];
         }
 
+        // Match the existing stage sprite shader, including enemies created at runtime.
+        if (sharedEnemyMaterial == null)
+            sharedEnemyMaterial = new Material(Shader.Find("Sprites/Default"));
+        enemyRenderer.sharedMaterial = sharedEnemyMaterial;
         enemyRenderer.color = Color.white;
         enemyRenderer.sortingLayerName = "Player";
         enemyRenderer.sortingOrder = 90;
-        transform.localScale = new Vector3(
-            Mathf.Max(0.01f, visualScale.x),
-            Mathf.Max(0.01f, visualScale.y), 1f);
+        ApplyUniformScale();
 
         contactCollider = GetComponent<BoxCollider2D>();
         if (contactCollider == null)
@@ -216,6 +245,8 @@ public class SubjiEnemyChase : MonoBehaviour
 
     void Start()
     {
+        if (player == null)
+            player = FindFirstObjectByType<SubjiPlayerMovement>()?.transform;
         if (player != null)
             playerMovement = player.GetComponent<SubjiPlayerMovement>();
 
@@ -249,17 +280,6 @@ public class SubjiEnemyChase : MonoBehaviour
     {
         if (player == null)
             return;
-
-        if (investigatingNoise && (playerMovement == null || !playerMovement.IsHidden))
-        {
-            if (Time.time >= noiseExpiresAt || Vector2.Distance(transform.position, noisePosition) < 0.5f)
-                investigatingNoise = false;
-            else
-            {
-                MoveAlongRoad(noisePosition, GetChaseSpeed());
-                return;
-            }
-        }
 
         if (Time.time >= nextLightVisibilityCheckTime)
         {
@@ -317,6 +337,17 @@ public class SubjiEnemyChase : MonoBehaviour
         {
             MoveAlongRoad(player.position, GetChaseSpeed(), true);
             return;
+        }
+
+        if (investigatingNoise)
+        {
+            if (Time.time >= noiseExpiresAt || Vector2.Distance(transform.position, noisePosition) < 0.5f)
+                investigatingNoise = false;
+            else
+            {
+                MoveAlongRoad(noisePosition, noiseApproachSpeed > 0f ? noiseApproachSpeed : GetChaseSpeed());
+                return;
+            }
         }
 
         if (movementType == MovementType.PatrolAndChase)
@@ -484,7 +515,11 @@ public class SubjiEnemyChase : MonoBehaviour
         return false;
     }
 
-    void OnEnable() => ActiveEnemies.Add(this);
+    void OnEnable()
+    {
+        ApplyUniformScale();
+        ActiveEnemies.Add(this);
+    }
     void OnDisable()
     {
         ActiveEnemies.Remove(this);

@@ -27,6 +27,7 @@ Shader "Subji/Static Darkness Reveal"
             float4 _PlayerData;
             float4 _FlashlightData;
             float4 _FlashlightDirection;
+            float4 _FlashlightEdgeData;
             int _PlacedLightCount;
             float4 _PlacedLights[30];
             float _OcclusionEnabled;
@@ -57,7 +58,16 @@ Shader "Subji/Static Darkness Reveal"
                     float facing = dot(normalize(fromPlayer), normalize(_FlashlightDirection.xy));
                     if (facing >= _FlashlightData.z)
                     {
-                        darkness = 0.0;
+                        float edgeReveal = 1.0;
+                        if (_FlashlightEdgeData.x > 0.00001)
+                        {
+                            float halfAngle = acos(clamp(_FlashlightData.z, -1.0, 1.0));
+                            float innerCos = cos(max(0.0, halfAngle - _FlashlightEdgeData.x));
+                            edgeReveal = pow(saturate((facing - _FlashlightData.z) /
+                                max(0.00001, innerCos - _FlashlightData.z)),
+                                max(0.01, _FlashlightEdgeData.y));
+                        }
+                        darkness *= 1.0 - edgeReveal;
                         if (_OcclusionEnabled > 0.5)
                         {
                             float2 direction = normalize(fromPlayer);

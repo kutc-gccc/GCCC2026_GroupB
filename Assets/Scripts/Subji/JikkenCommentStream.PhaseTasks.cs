@@ -5,6 +5,8 @@ using UnityEngine.InputSystem;
 
 public partial class JikkenCommentStream
 {
+    [InspectorName("達成後に次のタスクを自動追加")]
+    public bool autoAdvancePhaseTasks;
     [Header("フェーズ1・2 共通設定")]
     public bool enablePhaseTwoTasks;
     [Header("導入コメントの時間")]
@@ -24,10 +26,17 @@ public partial class JikkenCommentStream
     public Animator freeFallAnimator;
     public Transform freeFallSeat;
     public Transform trainWhistlePoint;
+    [InspectorName("花火の点火地点（城）")] public Transform fireworksPoint;
+    [Min(0.01f), InspectorName("花火の点火秒数")] public float fireworksSeconds = 3f;
+    [Min(0.1f), InspectorName("城の画像の端から操作できる距離")] public float fireworksInteractionRange = 9f;
+    [Min(0), InspectorName("花火の報酬")] public int fireworksSubscriberReward = 100000;
+    [Tooltip("シーンに配置した敵を登録してください。開始時は非表示、ID12達成時にその場所で有効になります。")]
+    [InspectorName("ID12クリア後に出現する敵")]
+    public SubjiEnemyChase[] fireworksClearEnemies = Array.Empty<SubjiEnemyChase>();
     [InspectorName("汽笛のアニメーション")]
     public Animator trainWhistleAnimator;
     public SubjiScenePortal hauntedHouseEntrance;
-    [Min(0.01f)] public float vendingSeconds = 1f;
+    [Min(0.01f)] public float vendingSeconds = 0.25f;
     [Min(0.01f)] public float bushSeconds = 0.5f;
     [Min(0.01f)] public float freeFallSeconds = 3f;
     [Min(0.01f)] public float whistleSeconds = 4f;
@@ -36,11 +45,19 @@ public partial class JikkenCommentStream
     [InspectorName("汽車の操作範囲倍率")]
     [Min(0.1f)] public float trainInteractionRangeMultiplier = 3f;
     [Min(0.1f)] public float whistleAlertRadius = 30f;
+    [Min(1), InspectorName("汽笛の通常出現数・最小")] public int whistleEnemyMinimum = 3;
+    [Min(1), InspectorName("汽笛の通常出現数・最大")] public int whistleEnemyMaximum = 6;
+    [Min(1), InspectorName("汽笛の大量出現数")] public int whistleEnemyJackpotCount = 10;
+    [Range(0f, 1f), InspectorName("汽笛の大量出現確率")] public float whistleEnemyJackpotChance = 0.25f;
     public AudioClip whistleClip;
     [Range(0f, 1f)] public float whistleVolume = 1f;
     public Key[] signSequence = { Key.UpArrow, Key.DownArrow, Key.LeftArrow,
         Key.DownArrow, Key.DownArrow, Key.RightArrow };
     [Min(0)] public int tutorialSubscriberReward = 100;
+    [Min(0), InspectorName("自販機タスクの報酬")] public int vendingSubscriberReward = 1000;
+    [TextArea, InspectorName("自販機の失敗メッセージ")]
+    public string vendingFailureMessage = "まだ揺らしが足りないようだ、もう少し揺らしてみよう";
+    [Min(0.01f), InspectorName("自販機の失敗表示秒数")] public float vendingFailureSeconds = 3f;
     [Min(0)] public int phaseTwoSubscriberReward = 5000;
     [Tooltip("出現順は開始時にシャッフル。7は必ず含まれます")]
     [SerializeField] private int[] phaseTwoOrder = Array.Empty<int>();
@@ -61,10 +78,19 @@ public partial class JikkenCommentStream
     private int qteIndex = -1;
     private bool whistleRunning;
     private bool whistleAlerted;
+    private SubjiEnemySpawner whistleEnemySpawner;
+    private bool whistleEnemiesSpawned;
+    [Min(0f), InspectorName("汽笛の敵をまいてから会話再開まで（秒）")]
+    public float whistleEscapeSeconds = 3f;
+    private readonly List<SubjiEnemyChase> whistleSpawnedEnemies = new();
+    private bool whistlePursuitSeen;
+    private float whistleEnemiesClearSince = -1f;
+    private float nextWhistleEscapeCheck;
     private bool ridingFreeFall;
     private Vector3 freeFallSeatRestPosition;
     private SubjiCameraFollow freeFallCamera;
     private GUIStyle phaseHintStyle;
+    private SpriteRenderer fireworksRenderer;
 
     private void InitializePhaseTasks()
     {
@@ -77,9 +103,13 @@ public partial class JikkenCommentStream
             playerMovement.gameObject.AddComponent<TimedWorldInteraction>();
         phaseInteraction.Ended += OnPhaseInteractionEnded;
         AlignFreeFallInteractionPoints();
+        if (fireworksPoint != null) fireworksRenderer = fireworksPoint.GetComponentInChildren<SpriteRenderer>();
         if (freeFallSeat != null) freeFallSeatRestPosition = freeFallSeat.localPosition;
         if (drinkItemController != null)
+        {
             drinkItemController.SetPurchaseDuration(vendingSeconds);
+            drinkItemController.EnableRandomVending();
+        }
         foreach (BushHideSpot2D bush in FindObjectsByType<BushHideSpot2D>(FindObjectsSortMode.None))
             bush.interactionDuration = bushSeconds;
         whistleSource = gameObject.AddComponent<AudioSource>();
@@ -89,12 +119,12 @@ public partial class JikkenCommentStream
         whistleSource.volume = whistleVolume;
         SubjiScenePortal.GoalReturned += OnHauntedGoalReturned;
         CachePhaseEnemies();
-        ApplyPhaseEnemyCounts(2, 0);
+        ApplyPhaseEnemyCounts(0, 0);
         currentPhase = 1;
         phaseTwoCompleted = false;
         introPhaseStep = playIntroTutorial ? 0 : 5;
         introPhaseTimer = playIntroTutorial ? phaseIntroDelay : 0f;
-        if (!playIntroTutorial)
+        if (!BeginMainStoryIntro() && !playIntroTutorial)
             OfferPhaseTask(1);
     }
 
@@ -121,6 +151,9 @@ public partial class JikkenCommentStream
 
     private void CachePhaseEnemies()
     {
+        foreach (var enemy in fireworksClearEnemies)
+            if (enemy != null && enemy.gameObject.scene == gameObject.scene)
+                enemy.gameObject.SetActive(false);
         phaseEnemies = FindObjectsByType<SubjiEnemyChase>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         Array.Sort(phaseEnemies, (a, b) => string.CompareOrdinal(a.name, b.name));
         var normal = new List<SubjiEnemyChase>();
@@ -128,12 +161,22 @@ public partial class JikkenCommentStream
         foreach (var enemy in phaseEnemies)
         {
             if (enemy.gameObject.scene != gameObject.scene) continue;
+            if (enemy.spawnTiming >= SubjiEnemyChase.SpawnTiming.AfterTask12)
+            {
+                enemy.gameObject.SetActive(false);
+                continue;
+            }
+            if (Array.IndexOf(fireworksClearEnemies, enemy) >= 0) continue;
             (enemy.movementType == SubjiEnemyChase.MovementType.GuardPost ? guards : normal).Add(enemy);
         }
         normalPhaseEnemies = normal.ToArray();
         guardPhaseEnemies = guards.ToArray();
         foreach (var spawner in FindObjectsByType<SubjiEnemySpawner>(FindObjectsSortMode.None))
-            if (spawner.gameObject.scene == gameObject.scene) spawner.enabled = false;
+            if (spawner.gameObject.scene == gameObject.scene)
+            {
+                spawner.enabled = false;
+                if (whistleEnemySpawner == null) whistleEnemySpawner = spawner;
+            }
     }
 
     private void ApplyPhaseEnemyCounts(int normalCount, int guardCount)
@@ -149,18 +192,23 @@ public partial class JikkenCommentStream
 
     private void UpdatePhaseTasks()
     {
+        UpdateStoryDebugControls();
+        if (vendingFailureLabel != null)
+            vendingFailureLabel.gameObject.SetActive(!isOpen && Time.time < vendingFailureUntil);
         if (phaseInteraction == null || playerMovement == null) return;
         if (Time.timeScale <= 0f || !playerMovement.isActiveAndEnabled)
         {
             if (whistleRunning || ridingFreeFall) phaseInteraction.Cancel();
             return;
         }
+        UpdateWhistleEscape();
         UpdatePhaseIntro();
         UpdateWhistleAnimation();
         if (whistleRunning && phaseInteraction.IsRunning && !whistleAlerted &&
             phaseInteraction.Elapsed >= whistleAlertSeconds)
         {
             whistleAlerted = true;
+            SpawnWhistleEnemies();
             foreach (var enemy in phaseEnemies)
                 if (enemy != null && enemy.isActiveAndEnabled &&
                     Vector2.Distance(enemy.transform.position, trainWhistlePoint.position) <= whistleAlertRadius)
@@ -168,11 +216,18 @@ public partial class JikkenCommentStream
         }
         if (selectedTask == null || isOpen || playerMovement.IsHidden || Keyboard.current == null) return;
         int id = selectedTask.designTaskId;
-        if (id != 5 && id != 6 && id != 8) return;
+        if (id != 5 && id != 6 && id != 8 && id != 12) return;
         Transform target = GetPhaseTarget(id);
         if (target == null) return;
         float interactionRange = phaseInteractionRange * (id == 8 ? trainInteractionRangeMultiplier : 1f);
-        bool inRange = Vector2.Distance(player.position, target.position) <= interactionRange;
+        Vector2 interactionPoint = target.position;
+        if (id == 12)
+        {
+            interactionRange = fireworksInteractionRange;
+            if (fireworksRenderer != null)
+                interactionPoint = fireworksRenderer.bounds.ClosestPoint(player.position);
+        }
+        bool inRange = Vector2.Distance(player.position, interactionPoint) <= interactionRange;
         if (!inRange)
         {
             if (qteIndex >= 0) playerMovement.SetInteractionMovementLocked(false);
@@ -187,7 +242,11 @@ public partial class JikkenCommentStream
         }
         if (phaseInteraction.IsRunning || !Keyboard.current.eKey.wasPressedThisFrame ||
             BushHideSpot2D.IsPlayerWithinInteractionRange(playerMovement)) return;
-        if (id == 6)
+        if (id == 12)
+        {
+            phaseInteraction.Begin(fireworksSeconds, CompleteSelectedPhaseTask);
+        }
+        else if (id == 6)
         {
             if (!phaseInteraction.Begin(freeFallSeconds, CompleteFreeFall, false)) return;
             ridingFreeFall = true;
@@ -221,11 +280,81 @@ public partial class JikkenCommentStream
         }
         else if (phaseInteraction.Begin(whistleSeconds, CompleteSelectedPhaseTask))
         {
+            mainStoryStartedTasks.Add(8);
             whistleAlerted = false;
             whistleRunning = true;
             whistleSource.Play();
             UpdateWhistleAnimation();
         }
+    }
+
+    private void SpawnWhistleEnemies()
+    {
+        if (whistleEnemiesSpawned || roadMap == null || normalPhaseEnemies.Length == 0) return;
+        if (whistleEnemySpawner == null)
+        {
+            whistleEnemySpawner = roadMap.GetComponent<SubjiEnemySpawner>() ??
+                roadMap.gameObject.AddComponent<SubjiEnemySpawner>();
+            whistleEnemySpawner.enabled = false;
+        }
+        whistleEnemySpawner.enemyTemplate = normalPhaseEnemies[0];
+        float remaining = Mathf.Max(0.1f, whistleSeconds - phaseInteraction.Elapsed);
+        float approachSeconds = remaining + 2f;
+        int count = UnityEngine.Random.value < whistleEnemyJackpotChance ? whistleEnemyJackpotCount :
+            UnityEngine.Random.Range(whistleEnemyMinimum, Mathf.Max(whistleEnemyMinimum, whistleEnemyMaximum) + 1);
+        Vector2 center = player.position;
+        float detectionRadius = Mathf.Max(normalPhaseEnemies[0].movingDetectionRadius,
+            normalPhaseEnemies[0].idleDetectionRadius);
+        float minimumDistance = detectionRadius + 3f;
+        float radius = Mathf.Max(minimumDistance, normalPhaseEnemies[0].chaseSpeed * approachSeconds + detectionRadius);
+        float offset = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+        for (int i = 0; i < count; i++)
+        {
+            float angle = offset + Mathf.PI * 2f * i / count;
+            Vector2 point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            SubjiEnemyChase enemy = whistleEnemySpawner.SpawnEnemyAt(point);
+            if (enemy == null) continue;
+            enemy.movementType = SubjiEnemyChase.MovementType.PatrolAndChase;
+            // Road snapping can place a candidate too close: choose another nearby road point.
+            if (Vector2.Distance(enemy.transform.position, center) < minimumDistance)
+            {
+                Vector2 extents = enemy.GetComponent<SpriteRenderer>().bounds.extents;
+                for (int attempt = 0; attempt < 12; attempt++)
+                {
+                    angle += Mathf.PI / 6f;
+                    point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (radius + attempt);
+                    point = roadMap.GetClosestPointOnRoad(point, extents);
+                    if (Vector2.Distance(point, center) < minimumDistance) continue;
+                    enemy.transform.position = point;
+                    break;
+                }
+                if (Vector2.Distance(enemy.transform.position, center) < minimumDistance)
+                {
+                    Destroy(enemy.gameObject);
+                    continue;
+                }
+            }
+            enemy.InvestigateNoise(center, approachSeconds);
+            whistleSpawnedEnemies.Add(enemy);
+        }
+        // Cancelling and retrying cannot add a second wave.
+        whistleEnemiesSpawned = true;
+    }
+
+    private void UpdateWhistleEscape()
+    {
+        if (!whistleEnemiesSpawned || Time.time < nextWhistleEscapeCheck) return;
+        nextWhistleEscapeCheck = Time.time + 0.1f;
+        foreach (var enemy in whistleSpawnedEnemies)
+        {
+            if (enemy == null || !enemy.isActiveAndEnabled || !enemy.IsChasingPlayer) continue;
+            whistlePursuitSeen = true;
+            whistleEnemiesClearSince = -1f;
+            return;
+        }
+        // A quiet period before the first pursuit is not an escape.
+        if (whistlePursuitSeen && whistleEnemiesClearSince < 0f)
+            whistleEnemiesClearSince = Time.time;
     }
 
     private void UpdateWhistleAnimation()
@@ -253,6 +382,7 @@ public partial class JikkenCommentStream
 
     private void UpdatePhaseIntro()
     {
+        if (UpdateMainStoryIntro()) return;
         if (introPhaseStep >= 5) return;
         introPhaseTimer -= Time.deltaTime;
         if (introPhaseStep == 0 && introPhaseTimer <= 0f)
@@ -295,7 +425,7 @@ public partial class JikkenCommentStream
     private void PhaseMessage(string message)
     {
         AddTutorialHistoryComment(message, normalTextColor);
-        ShowPopup(message, popupTextColor);
+        if (!MainStoryOwnsPopup) ShowPopup(message, popupTextColor);
     }
 
     private string PhaseTaskName(int id) => id switch
@@ -303,21 +433,21 @@ public partial class JikkenCommentStream
         1 => "噴水広場に行こう", 2 => "自販機でジュースを買おう",
         3 => "ブッシュの中に隠れよう", 5 => "壁にサインして",
         6 => "フリーーーーフォール!!", 7 => "お化け屋敷の潜入調査",
-        8 => "車掌さんごっこ", _ => "タスク"
+        8 => "車掌さんごっこ", 12 => "フライング花火大会", _ => "タスク"
     };
 
     private Transform GetPhaseTarget(int id) => id switch
     {
         1 => fountainDestination, 5 => signLocation, 6 => freeFallBoardingPoint,
         7 => hauntedHouseEntrance != null ? hauntedHouseEntrance.transform : null,
-        8 => trainWhistlePoint, _ => null
+        8 => trainWhistlePoint, 12 => fireworksPoint, _ => null
     };
 
     private void OfferPhaseTask(int id)
     {
         string message = "◆ " + PhaseTaskName(id);
         CreateSelectableTaskComment(message, rect => AcceptPhaseTask(rect, id));
-        ShowPopup(message + "（左のタスク欄から開始）", popupTextColor);
+        ShowPopup(message + "（左のタスク欄から開始）", popupTextColor, isTaskComment: true);
     }
 
     private void AcceptPhaseTask(RectTransform source, int id)
@@ -337,7 +467,8 @@ public partial class JikkenCommentStream
             taskView = CreateTaskView(text), destination = target != null ? (Vector2)target.position : Vector2.zero,
             completionType = id == 1 ? TaskCompletionType.Destination :
                 id == 2 ? TaskCompletionType.VendingPurchase : id == 3 ? TaskCompletionType.BushHide : TaskCompletionType.PhaseTask,
-            subscriberReward = id <= 3 ? tutorialSubscriberReward : phaseTwoSubscriberReward
+            subscriberReward = id == 12 ? fireworksSubscriberReward : id == 2 ? vendingSubscriberReward :
+                id <= 3 ? tutorialSubscriberReward : phaseTwoSubscriberReward
         });
         if (id == 2)
         {
@@ -353,6 +484,7 @@ public partial class JikkenCommentStream
         }
         else if (id >= 5) roadMap?.SetActiveTaskTargets(new[] { target });
         activeWorldTaskGuidance = id == 1 ? "噴水の目的地へ移動しよう" :
+            id == 2 ? "自販機の近くでEを押して揺らそう。ドリンクが出たら達成" :
             id == 7 ? "入口でEを押して入場し、お化け屋敷のゴールへ" :
             "目的地の近くでEを1回押すと操作開始。移動するとキャンセル";
         if (id == 6) activeWorldTaskGuidance = "乗り場でE。乗車中は途中下車できません";
@@ -363,6 +495,10 @@ public partial class JikkenCommentStream
     private void AdvancePhaseTasks(AcceptedTask task)
     {
         qteIndex = -1;
+        if (task.designTaskId == 1) ApplyPhaseEnemyCounts(2, 0);
+        if (task.designTaskId == 12) ActivateFireworksClearEnemies();
+        if (HandleMainStoryTaskCompletion(task.designTaskId)) return;
+        if (!autoAdvancePhaseTasks) return;
         switch (task.designTaskId)
         {
             case 1: OfferPhaseTask(2); break;
@@ -433,6 +569,28 @@ public partial class JikkenCommentStream
     private void CompleteSelectedPhaseTask()
     {
         if (selectedTask?.completionType == TaskCompletionType.PhaseTask) CompleteActiveTask();
+    }
+
+    private void ActivateFireworksClearEnemies()
+    {
+        if (greenGuardContainer != null) greenGuardContainer.SetActive(true);
+        foreach (var enemy in phaseEnemies)
+            if (enemy != null && enemy.gameObject.scene == gameObject.scene &&
+                enemy.spawnTiming <= SubjiEnemyChase.SpawnTiming.AfterTask12)
+            {
+                enemy.player = playerMovement.transform;
+                enemy.roadMap = roadMap;
+                enemy.enabled = true;
+                enemy.gameObject.SetActive(true);
+            }
+        foreach (var enemy in fireworksClearEnemies)
+            if (enemy != null && enemy.gameObject.scene == gameObject.scene)
+            {
+                enemy.player = playerMovement.transform;
+                enemy.roadMap = roadMap;
+                enemy.enabled = true;
+                enemy.gameObject.SetActive(true);
+            }
     }
 
     private void CompleteFreeFall()

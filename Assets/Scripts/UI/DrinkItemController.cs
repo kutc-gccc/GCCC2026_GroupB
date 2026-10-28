@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public sealed class DrinkItemController : MonoBehaviour
 {
     public event Action DrinkPurchased;
+    public event Action VendingAttemptFailed;
 
     [Header("Vending Machine")]
     [SerializeField] private Key purchaseKey = Key.E;
@@ -38,6 +39,9 @@ public sealed class DrinkItemController : MonoBehaviour
     private SubjiPlayerMovement player;
     private VendingMachinePurchaseZone[] vendingZones;
     private TimedWorldInteraction timedInteraction;
+    private bool randomVending;
+    private int vendingAttempts;
+    public void EnableRandomVending() { randomVending = true; vendingAttempts = 0; }
     public void SetPurchaseDuration(float seconds) => purchaseDuration = Mathf.Max(0.01f, seconds);
 
     public Transform[] GetVendingMachineTransforms()
@@ -62,20 +66,6 @@ public sealed class DrinkItemController : MonoBehaviour
         FindDrinkIcons();
     }
 
-    private void OnEnable()
-    {
-        if (selector == null)
-            selector = GetComponent<ItemSlotSelector>();
-        if (selector != null)
-            selector.SelectedSlotClicked += UseDrink;
-    }
-
-    private void OnDisable()
-    {
-        if (selector != null)
-            selector.SelectedSlotClicked -= UseDrink;
-    }
-
     private void Update()
     {
         if (Keyboard.current == null ||
@@ -92,6 +82,14 @@ public sealed class DrinkItemController : MonoBehaviour
 
         if (vendingZones.Any(zone => zone != null && zone.IsPlayerInside))
         {
+            if (timedInteraction != null && timedInteraction.IsRunning) return;
+            if (randomVending)
+            {
+                // Only an attempt with room for a drink counts; the first always fails.
+                if (!drinkIcons.Any(pair => !pair.Value.gameObject.activeSelf)) return;
+                timedInteraction?.Begin(purchaseDuration, AttemptRandomVending);
+                return;
+            }
             if (timedInteraction == null)
                 timedInteraction = player.GetComponent<TimedWorldInteraction>() ??
                     player.gameObject.AddComponent<TimedWorldInteraction>();
@@ -108,39 +106,60 @@ public sealed class DrinkItemController : MonoBehaviour
                 continue;
 
             icon.gameObject.SetActive(true);
+            icon.color = Color.white;
+            icon.canvasRenderer.SetAlpha(1f);
             DrinkPurchased?.Invoke();
             return;
         }
     }
 
-    private void UseDrink(int selectedSlotIndex)
+    private void AttemptRandomVending()
     {
-        if (!drinkIcons.TryGetValue(selectedSlotIndex, out Image icon) ||
-            !icon.gameObject.activeSelf)
-            return;
+        vendingAttempts++;
+        if (vendingAttempts == 1 || UnityEngine.Random.Range(0, 8) != 0)
+            VendingAttemptFailed?.Invoke();
+        else
+            PurchaseDrink();
+    }
+
+    public bool TryUseDrink(RectTransform selectedSlot)
+    {
+        if (selectedSlot == null || selectedSlot.parent != transform || Time.timeScale <= 0f)
+            return false;
+        Transform iconTransform = selectedSlot.Find("DrinkIcon");
+        if (iconTransform == null || !iconTransform.gameObject.activeInHierarchy ||
+            !iconTransform.TryGetComponent(out Image icon))
+            return false;
 
         if (player == null)
             player = FindFirstObjectByType<SubjiPlayerMovement>();
         if (player == null)
-            return;
+            return false;
 
         player.PreventStaminaDrain(effectDuration, effectGaugeColor);
         icon.gameObject.SetActive(false);
+        return true;
     }
 
     private void FindDrinkIcons()
     {
         drinkIcons.Clear();
-        RectTransform[] slots = GetComponentsInChildren<RectTransform>(true)
-            .Where(rect => rect.parent == transform)
-            .OrderBy(rect => rect.anchoredPosition.x)
-            .ToArray();
+        if (selector == null)
+            selector = GetComponent<ItemSlotSelector>();
+        if (selector == null)
+            return;
+        selector.RefreshSlots();
+        IReadOnlyList<RectTransform> slots = selector.Slots;
 
-        for (int i = 0; i < slots.Length; i++)
+        for (int i = 0; i < slots.Count; i++)
         {
             Transform iconTransform = slots[i].Find("DrinkIcon");
             if (iconTransform != null && iconTransform.TryGetComponent(out Image icon))
+            {
+                icon.color = Color.white;
+                icon.canvasRenderer.SetAlpha(1f);
                 drinkIcons[i] = icon;
+            }
         }
     }
 
